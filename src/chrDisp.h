@@ -16,7 +16,8 @@ public:
         EVENT_NOTICE = 10,
         EVENT_ON = 12,
         EVENT_OFF = 14,
-        EVENT_REFRESHED = 16
+        EVENT_REFRESHED = 16,
+        EVENT_BLINK = 18
     };
 
     // Types of displayable items
@@ -48,7 +49,7 @@ public:
                                     // - for texts -1 means total inversion,
                                     // - positive numbers indicate inversion of the character itself (1st, 2nd, etc.),
                                     // - negative numbers indicate inversion of every 2nd, 3rd, 4th character respectively
-        uint8_t blink = 0b1111;     // In which quarter of the blinking the item should appear on the display
+        uint8_t blink = 0b11111111; // In which quarter of the blinking the item should appear on the display (max 8 quarters)
         int16_t blinkChar = 0;      // For texts: blink characters with the same method like inversion works for texts (but 0 and -1 means the same, a fully blinking text)
         const char* skipChars = nullptr; // Characters to ignore during blinking or inversion (you can set for eg. space or new line chars if they just separate text parts)
         uint8_t frame = 0;          // A button like rounded rect around the item
@@ -77,7 +78,11 @@ public:
     void off();
     void on();
     void dim(bool dim_on = true);
+    bool invert(bool invert_on = true); // Returns true if the inversion state changed
     void clear();
+    void resetBlinkQuarter();
+    bool checkBlinkBit(uint8_t blink) { return checkBlinkBit(blink, _blinkQuarter); }
+    bool checkBlinkBit(uint8_t blink, uint8_t at_quarter);
 
     // In every loop() (automatically handles on / off)
     // - return value is true if there was a write to the display
@@ -91,15 +96,15 @@ public:
     bool isOn();
     uint32_t getTurnOffMs();
     
-    void drawVBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawHBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawBattery  (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawCharge   (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
-    void drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
-    void drawDisk     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawWiFi     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawAP       (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
-    void drawPotmeter (int16_t x, int16_t y, uint16_t width, uint16_t zeroPointDeg, uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t level = 0);
+    void drawVBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
+    void drawHBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
+    void drawBattery  (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
+    void drawCharge   (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
+    void drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
+    void drawDisk     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
+    void drawWiFi     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
+    void drawAP       (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
+    void drawPotmeter (int16_t x, int16_t y, uint16_t width, uint16_t zeroPointDeg, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t level = 0);
 
     // Defining the pointer
     using DrawFuncPtr = void (chrDisp::*)(int16_t, int16_t, uint16_t, uint16_t, uint8_t, bool, uint8_t, uint8_t);
@@ -118,7 +123,7 @@ public:
     };
 
     // Creating the calling function
-    void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t val = 0) {
+    void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t val = 0) {
         if (type >= 0 && type < ITEM_COUNT) {
             // Calling the pointer on the current (this) object
             (this->*DRAW_FUNCTIONS[type])(x, y, w, h, blink, invert, frame, val);
@@ -144,12 +149,13 @@ private:
     uint32_t _turnOffMs;
     bool _isOn;
     bool _isDimmed;
+    bool _isInverted;
     bool _needRedraw;
     uint32_t _lastRedrawMillis;
     uint32_t _lastOnMillis;
     EventCallback _onEvent;
-    uint8_t _blinkCounter;  // blinking enabled element
-    uint32_t _lastBlinkCounterChangeMillis;
+    uint8_t _blinkQuarter;  // counts 0-7 (1/4 - 8/4)
+    uint32_t _blinkQuarterChangedMillis;
     const DisplayItem* _lastAutoBlinkItems;
     uint8_t _lastAutoBlinkItemsCount;
     bool _firstLoop;
@@ -159,11 +165,10 @@ private:
     static constexpr uint16_t MIN_TURN_OFF_MS = DIM_TIME_MS * 2;
     static constexpr uint8_t ROUNDED_RECT_RADIUS = 3;   // 3 pixel won't be a problem on filled icons
 
-    bool _checkBlinkBit(uint8_t blink, int8_t at_index);
     void _drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t frame = 0);
     void _drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0, bool batteryTip = false);
     void _drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0);
-    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, uint8_t width = 0, uint8_t blink = 0b1111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0);
+    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, uint8_t width = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0);
     // Internal event handler
     void _fireEvent(int8_t code, const char* action);
 };

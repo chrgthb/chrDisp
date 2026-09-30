@@ -78,19 +78,19 @@ void loop() {
     // Structure layout: {text, size(h), width(w), x, y, type, invert, blink, percent/level}
     static chrDisp::DisplayItem uiItems[] = {
         // 1. Simple text in the top-left corner
-        {"chrDisp OK", 1, 0, 0, 0, chrDisp::ITEM_TEXT, 0, 0b1111, 0, nullptr, 0, 0},
+        {"chrDisp OK", 1, 0, 0, 0, chrDisp::ITEM_TEXT, 0, 0b11111111, 0, nullptr, 0, 0},
         
         // 2. Battery icon in the top-right corner (75% charged)
-        {nullptr, 10, 20, 105, 0, chrDisp::ITEM_BATTERY, 0, 0b1111, 0, nullptr, 0, 75},
+        {nullptr, 10, 20, 105, 0, chrDisp::ITEM_BATTERY, 0, 0b11111111, 0, nullptr, 0, 75},
         
-        // 3. WiFi icon, blinking (0b1010 pattern) with 50% signal strength
-        {nullptr, 16, 16, 0, 20, chrDisp::ITEM_WIFI, 0, 0b1010, 0, nullptr, 0, 50},
+        // 3. WiFi icon, blinking (0b10101010 pattern) with 50% signal strength
+        {nullptr, 16, 16, 0, 20, chrDisp::ITEM_WIFI, 0, 0b10101010, 0, nullptr, 0, 50},
         
         // 4. Potmeter icon (circle), size = 0-degree starting point, with a 128 (half-full) value
-        {nullptr, 0, 24, 30, 20, chrDisp::ITEM_POTMETER, 0, 0b1111, 0, nullptr, 0, 128},
+        {nullptr, 0, 24, 30, 20, chrDisp::ITEM_POTMETER, 0, 0b11111111, 0, nullptr, 0, 128},
         
         // 5. Disk icon with 90% fill level
-        {nullptr, 16, 16, 70, 20, chrDisp::ITEM_DISK, 0, 0b1111, 0, nullptr, 0, 90}
+        {nullptr, 16, 16, 70, 20, chrDisp::ITEM_DISK, 0, 0b11111111, 0, nullptr, 0, 90}
     };
 
     // Call main logic loop

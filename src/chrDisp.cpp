@@ -6,21 +6,23 @@ chrDisp::chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs, uint16_t fgColor, uint16
       _id(id),
       _width(gfx ? gfx->width() : 0),
       _height(gfx ? gfx->height() : 0),
-      _turnOffMs(turnOffMs),
+//      _turnOffMs(turnOffMs),
       _fgColor(fgColor),
       _bgColor(bgColor),
       _isOn(false),
       _isDimmed(false),
+      _isInverted(false),
       _needRedraw(false),
       _lastRedrawMillis(0),
       _lastOnMillis(0),
       _onEvent(nullptr),
-      _blinkCounter(0),
-      _lastBlinkCounterChangeMillis(0),
+      _blinkQuarter(0),
+      _blinkQuarterChangedMillis(0),
       _lastAutoBlinkItems(nullptr),
       _lastAutoBlinkItemsCount(0),
       _firstLoop(true)
 {
+    chrDisp::setTurnOff(turnOffMs);
     if (_gfx != nullptr) _gfx->cp437(true);
 }
 
@@ -43,8 +45,6 @@ void chrDisp::on() {
         if (_hwPower) { _hwPower(true); }
 
         _isOn = true;
-        _blinkCounter = 0;
-        _lastBlinkCounterChangeMillis = millis();
         _fireEvent(EVENT_ON, "turned on");
     }
     
@@ -61,10 +61,33 @@ void chrDisp::dim(bool dim_on) {
     _fireEvent(EVENT_NOTICE, _isDimmed ? "dim on" : "dim off");
 }
 
+bool chrDisp::invert(bool invert_on) {
+    if (_isInverted == invert_on) return false;
+
+    if (_hwInvert) {
+        _hwInvert(invert_on);
+
+        _isInverted = invert_on;
+        _fireEvent(EVENT_NOTICE, _isInverted ? "invert on" : "invert off");
+    }
+
+    return _isInverted == invert_on;
+}
+
 void chrDisp::clear() {
     if (_gfx == nullptr) return;
     if (_hwClear) { _hwClear(); } 
     else { _gfx->fillScreen(_bgColor); } // Safety default GFX clear
+}
+
+void chrDisp::resetBlinkQuarter() {
+    _blinkQuarter = 0;
+    _blinkQuarterChangedMillis = millis();
+}
+
+bool chrDisp::checkBlinkBit(uint8_t blink, uint8_t at_quarter) {
+    at_quarter = at_quarter % 8;
+    return ((blink >> (7 - at_quarter)) & 1) != 0;
 }
 
 void chrDisp::setEventCallback(EventCallback cb) {
@@ -95,13 +118,6 @@ void chrDisp::_fireEvent(int8_t code, const char* action) {
     snprintf(msg, sizeof(msg), "disp [%u] %s", _id, action);
     
     _onEvent(code, msg);
-}
-
-bool chrDisp::_checkBlinkBit(uint8_t blink, int8_t at_index) {
-    at_index = at_index % 4;
-    if (at_index < 0) at_index += 4;
-
-    return ((blink >> (3 - at_index)) & 1) != 0;
 }
 
 void chrDisp::_drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert, uint8_t frame) {
@@ -206,7 +222,7 @@ void chrDisp::drawVBar(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // Do not draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     _drawVFilledRectHelper(x, y, width, height, invert, percent, ROUNDED_RECT_RADIUS);
 }
@@ -222,7 +238,7 @@ void chrDisp::drawHBar(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // Do not draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     _drawHFilledRectHelper(x, y, width, height, invert, percent, ROUNDED_RECT_RADIUS);
 }
@@ -238,7 +254,7 @@ void chrDisp::drawBattery(int16_t x, int16_t y, uint16_t width, uint16_t height,
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // Do not draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     _drawVFilledRectHelper(x, y, width, height, invert, percent, ROUNDED_RECT_RADIUS, true);
 }
@@ -255,7 +271,7 @@ void chrDisp::drawCharge(int16_t x, int16_t y, uint16_t width, uint16_t height, 
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // Do not draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     uint16_t color = invert ? _bgColor : _fgColor;
 
@@ -309,7 +325,7 @@ void chrDisp::drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t heigh
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // Do not draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     uint16_t color = invert ? _bgColor : _fgColor;
     uint16_t centerX = x + (width / 2);
@@ -338,7 +354,7 @@ void chrDisp::drawDisk(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // Do not draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     // Color constant
     uint16_t color = invert ? _bgColor : _fgColor;
@@ -372,7 +388,7 @@ void chrDisp::drawDisk(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
     // Safety check to ensure there is actually space to draw (on smaller displays)
     if (bottomY > barTopY + 2) {
         uint16_t barHeight = bottomY - barTopY - 1;
-        drawVBar(x + 2, barTopY, width - 4, barHeight, false, invert, percent);
+        drawVBar(x + 2, barTopY, width - 4, barHeight, blink, invert, 0, percent);
     }
 }
 
@@ -387,7 +403,7 @@ void chrDisp::drawWiFi(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // Do not draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     uint16_t color = invert ? _bgColor : _fgColor;
     uint16_t bottomY = y + height - 1;
@@ -451,7 +467,7 @@ void chrDisp::drawAP(int16_t x, int16_t y, uint16_t width, uint16_t height, uint
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return;  // No need to draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return;  // No need to draw during this phase of blinking
 
     uint16_t color = invert ? _bgColor : _fgColor;
     uint16_t bottomY = y + height - 1;
@@ -482,7 +498,7 @@ void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPo
         _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
     }
 
-    if (!_checkBlinkBit(blink, _blinkCounter)) return; // No need to draw during this phase of blinking
+    if (!checkBlinkBit(blink, _blinkQuarter)) return; // No need to draw during this phase of blinking
 
     uint16_t color = invert ? _bgColor : _fgColor;
 
@@ -545,7 +561,7 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
     }
 
     bool fullBlink = blinkChar == 0 || blinkChar == -1;
-    bool noLit = !_checkBlinkBit(blink, _blinkCounter);
+    bool noLit = !checkBlinkBit(blink, _blinkQuarter);
     if (fullBlink && noLit) {
         // No need to draw during this phase of blinking
         return;
@@ -621,12 +637,18 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
         dim(false);
     }
 
-    // Blinking timing
+    // Blinking timing (calculate only once per BLINK_INTERVAL_MS)
     bool blinkPhaseChanged = false;
-    if (now - _lastBlinkCounterChangeMillis > BLINK_INTERVAL_MS) {
-        _blinkCounter = (_blinkCounter + 1) % 4;
-        _lastBlinkCounterChangeMillis = now;
+    uint32_t elapsedSincePrevQuarter = now - _blinkQuarterChangedMillis;
+    if (elapsedSincePrevQuarter > BLINK_INTERVAL_MS) {
+        uint32_t currentQuarterMillis = _blinkQuarterChangedMillis + (elapsedSincePrevQuarter / BLINK_INTERVAL_MS) * BLINK_INTERVAL_MS;
+        _blinkQuarter = (currentQuarterMillis / 250) % 8;
+        _blinkQuarterChangedMillis = currentQuarterMillis;
         blinkPhaseChanged = true;
+
+        char msg[16];
+        snprintf(msg, sizeof(msg), "blink: %u", _blinkQuarter);
+        _fireEvent(chrDisp::EVENT_BLINK, msg);
     }
     
     if (items != nullptr && itemCount > 0) {
@@ -646,11 +668,13 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
         // There is a previously saved item, the question is whether something needs to blink
 
         for (uint8_t i = 0; i < _lastAutoBlinkItemsCount; i++) {
-          if (_lastAutoBlinkItems[i].blink != 0b1111) {
+          if (_lastAutoBlinkItems[i].blink != 0b11111111) {
             // There is an item waiting to blink
 
-            bool currentOn = _checkBlinkBit(_lastAutoBlinkItems[i].blink, _blinkCounter - 1);
-            bool nextOn = _checkBlinkBit(_lastAutoBlinkItems[i].blink, _blinkCounter);
+            int8_t prevQuarter = _blinkQuarter - 1;
+            if (prevQuarter < 0) prevQuarter += 8;
+            bool currentOn = checkBlinkBit(_lastAutoBlinkItems[i].blink, prevQuarter);
+            bool nextOn = checkBlinkBit(_lastAutoBlinkItems[i].blink, _blinkQuarter);
 
             if (currentOn != nextOn) {
               // The item waiting to blink will now be in a different state than it was, so a redraw is needed
@@ -676,7 +700,7 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
             if (items[i].type == ITEM_TEXT) {
                 _drawTextHelper(items[i].x, items[i].y, items[i].size, items[i].text, items[i].width, items[i].blink, items[i].blinkChar, items[i].invert, items[i].skipChars, items[i].frame);
             } else {
-                drawItem(items[i].type, items[i].x, items[i].y, items[i].width, items[i].size, items[i].blink, items[i].invert != 0, items[i].data, items[i].frame);
+                drawItem(items[i].type, items[i].x, items[i].y, items[i].width, items[i].size, items[i].blink, items[i].invert != 0, items[i].frame, items[i].data);
             }
           }
       }
@@ -687,8 +711,9 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
   
     if (_needRedraw || (now - _lastRedrawMillis > BLINK_INTERVAL_MS)) {
       // Inversion is only performed at BLINK_INTERVAL_MS intervals; if the screen did not need to be refreshed, this ensures that calling the loop with true once and then immediately with false will invert the screen for at least BLINK_INTERVAL_MS
-      if (_hwInvert) { _hwInvert(invertDisplay); }
-      refreshed = true;
+      if (invert(invertDisplay)) {
+          refreshed = true;
+      }
     }
 
     if (_needRedraw) {
@@ -702,7 +727,7 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
 }
 
 bool chrDisp::loop(bool turnOnResetSleep, const char* text, uint8_t size, bool invertDisplay, bool clearDisplay) {
-    DisplayItem items[1] = { text, size, 0, 0, 0, ITEM_TEXT, invertDisplay};
+    DisplayItem items[1] = { text, size };
     return loop(turnOnResetSleep, false, items, 1, invertDisplay, clearDisplay);
 }
 
