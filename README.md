@@ -18,7 +18,7 @@ The library targets the Arduino framework and works with any display driver comp
 - Automatic sleep and dimming management based on configurable inactivity timers
 - Flexible hardware callbacks for display driver operations (`hwUpdate`, `hwClear`, `hwPower`, `hwDimming`, `hwInvert`)
 - Rich set of built-in UI elements and vector icons
-- Character-level and item-level blinking (using 4-bit phase bitmasks) and inversion options
+- Character-level and item-level blinking (using 8-bit phase bitmasks) and inversion options
 - Efficient auto-blinking storage to handle blinking phases without redundant redrawing overhead in the main loop
 
 ## Dependency
@@ -100,6 +100,8 @@ Public methods declared in [chrDisp.h](chrDisp.h):
 	- Overloaded loop helper to refresh display state using previously stored auto-blink items.
 - `void setEventCallback(EventCallback cb)`
 	- Registers global event callback.
+- `void setBlinkCallback(BlinkCallback cb)`
+	- Registers blink callback.
 - `void setTurnOff(uint32_t turnOffMs)`
 	- Sets auto turn-off timeout in milliseconds.
 - `bool isOn()`
@@ -108,7 +110,7 @@ Public methods declared in [chrDisp.h](chrDisp.h):
 	- Returns configured turn-off timeout in milliseconds.
 - Icon drawing methods:
 	- `drawVBar(...)`, `drawHBar(...)`, `drawBattery(...)`, `drawCharge(...)`, `drawCrosshair(...)`, `drawDisk(...)`, `drawWiFi(...)`, `drawAP(...)`, `drawPotmeter(...)`
-- `void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b1111, bool invert = false, uint8_t frame = 0, uint8_t val = 0)`
+- `void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t val = 0)`
 	- Generic dispatcher for drawing any item type by enum index.
 
 ## Display Items and UI Elements
@@ -137,7 +139,7 @@ struct DisplayItem {
     int16_t y = 0;
     ItemTypes type = ITEM_TEXT;
     int16_t invert = 0;
-    uint8_t blink = 0b1111;
+    uint8_t blink = 0b11111111;
     int16_t blinkChar = 0;
     const char* skipChars = nullptr;
     uint8_t frame = 0;
@@ -178,7 +180,7 @@ platformio run
 
 ## Notes
 
-- Blinking logic uses a 250 ms tick interval (`BLINK_INTERVAL_MS = 250`) and a 4-bit bitmask (`0b1111` = always visible).
+- Blinking logic uses a 250 ms tick interval (`BLINK_INTERVAL_MS = 250`) and a 8-bit bitmask (`0b11111111` = always visible).
 - Automatic dimming activates when 5 seconds (`DIM_TIME_MS = 5000`) remain before complete turn-off.
 - The minimum allowed turn-off timeout is 10 seconds (`MIN_TURN_OFF_MS = 10000`).
 

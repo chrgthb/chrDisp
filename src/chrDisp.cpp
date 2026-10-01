@@ -4,8 +4,6 @@
 chrDisp::chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs, uint16_t fgColor, uint16_t bgColor, uint8_t id) 
     : _gfx(gfx),
       _id(id),
-      _width(gfx ? gfx->width() : 0),
-      _height(gfx ? gfx->height() : 0),
 //      _turnOffMs(turnOffMs),
       _fgColor(fgColor),
       _bgColor(bgColor),
@@ -16,6 +14,7 @@ chrDisp::chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs, uint16_t fgColor, uint16
       _lastRedrawMillis(0),
       _lastOnMillis(0),
       _onEvent(nullptr),
+      _onBlink(nullptr),
       _blinkQuarter(0),
       _blinkQuarterChangedMillis(0),
       _lastAutoBlinkItems(nullptr),
@@ -92,6 +91,10 @@ bool chrDisp::checkBlinkBit(uint8_t blink, uint8_t at_quarter) {
 
 void chrDisp::setEventCallback(EventCallback cb) {
     _onEvent = cb;
+}
+
+void chrDisp::setBlinkCallback(BlinkCallback cb) {
+    _onBlink = cb;
 }
 
 void chrDisp::setTurnOff(uint32_t turnOffMs) {
@@ -637,18 +640,16 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
         dim(false);
     }
 
-    // Blinking timing (calculate only once per BLINK_INTERVAL_MS)
-    bool blinkPhaseChanged = false;
+    // Blinking timing (calculate only if BLINK_INTERVAL_MS passed)
+    uint8_t oldBlinkQuarter = _blinkQuarter;
     uint32_t elapsedSincePrevQuarter = now - _blinkQuarterChangedMillis;
     if (elapsedSincePrevQuarter > BLINK_INTERVAL_MS) {
-        uint32_t currentQuarterMillis = _blinkQuarterChangedMillis + (elapsedSincePrevQuarter / BLINK_INTERVAL_MS) * BLINK_INTERVAL_MS;
-        _blinkQuarter = (currentQuarterMillis / 250) % 8;
-        _blinkQuarterChangedMillis = currentQuarterMillis;
-        blinkPhaseChanged = true;
+        uint32_t elapsedQuarters = elapsedSincePrevQuarter / BLINK_INTERVAL_MS;
+        _blinkQuarter = (_blinkQuarter + elapsedQuarters) % 8;
+        _blinkQuarterChangedMillis += elapsedQuarters * BLINK_INTERVAL_MS;
 
-        char msg[16];
-        snprintf(msg, sizeof(msg), "blink: %u", _blinkQuarter);
-        _fireEvent(chrDisp::EVENT_BLINK, msg);
+        // Fire the blink callback if it is set
+        if (_onBlink) _onBlink(_id, _blinkQuarter);
     }
     
     if (items != nullptr && itemCount > 0) {
@@ -662,18 +663,16 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
         _lastAutoBlinkItemsCount = itemCount;
       }
     } else {
-      // It would not be necessary to redraw the screen, but... (blinking?)
+      // It would not be necessary to redraw the screen, but should check if blinking items need to change state
 
-      if (blinkPhaseChanged && _lastAutoBlinkItems != nullptr && _lastAutoBlinkItemsCount > 0) {
+      if (oldBlinkQuarter != _blinkQuarter && _lastAutoBlinkItems != nullptr && _lastAutoBlinkItemsCount > 0) {
         // There is a previously saved item, the question is whether something needs to blink
 
         for (uint8_t i = 0; i < _lastAutoBlinkItemsCount; i++) {
           if (_lastAutoBlinkItems[i].blink != 0b11111111) {
             // There is an item waiting to blink
 
-            int8_t prevQuarter = _blinkQuarter - 1;
-            if (prevQuarter < 0) prevQuarter += 8;
-            bool currentOn = checkBlinkBit(_lastAutoBlinkItems[i].blink, prevQuarter);
+            bool currentOn = checkBlinkBit(_lastAutoBlinkItems[i].blink, oldBlinkQuarter);
             bool nextOn = checkBlinkBit(_lastAutoBlinkItems[i].blink, _blinkQuarter);
 
             if (currentOn != nextOn) {

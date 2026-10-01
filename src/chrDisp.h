@@ -6,7 +6,8 @@
 
 class chrDisp {
 public:
-    using EventCallback = std::function<void(int8_t, const char*)>;
+    using EventCallback = std::function<void(int8_t, const char*)>; // Event callback: parameters are event code and message
+    using BlinkCallback = std::function<void(uint8_t, uint8_t)>; // Blink callback: parameters are display ID and blink quarter
 
     // Event codes
     enum EventCode {
@@ -16,8 +17,7 @@ public:
         EVENT_NOTICE = 10,
         EVENT_ON = 12,
         EVENT_OFF = 14,
-        EVENT_REFRESHED = 16,
-        EVENT_BLINK = 18
+        EVENT_REFRESHED = 16
     };
 
     // Types of displayable items
@@ -92,6 +92,7 @@ public:
     bool loop(bool turnOnResetSleep);   // loop(true, nullptr); in this case the compiler would not know which loop() method to call, so this can also be used or the type must be specified, e.g   .: (const MyDisplayTextItem*)nullptr
 
     void setEventCallback(EventCallback cb);
+    void setBlinkCallback(BlinkCallback cb);
     void setTurnOff(uint32_t turnOffMs);
     bool isOn();
     uint32_t getTurnOffMs();
@@ -142,8 +143,6 @@ private:
     HardwareBoolAction _hwInvert = nullptr;
 
     uint8_t _id;
-    uint16_t _width;
-    uint16_t _height;
     uint16_t _fgColor;
     uint16_t _bgColor;
     uint32_t _turnOffMs;
@@ -154,6 +153,7 @@ private:
     uint32_t _lastRedrawMillis;
     uint32_t _lastOnMillis;
     EventCallback _onEvent;
+    BlinkCallback _onBlink;
     uint8_t _blinkQuarter;  // counts 0-7 (1/4 - 8/4)
     uint32_t _blinkQuarterChangedMillis;
     const DisplayItem* _lastAutoBlinkItems;
