@@ -36,7 +36,7 @@ void chrDisp::off() {
     if (_hwPower) { _hwPower(false); }
     _isOn = false;
     
-    _fireEvent(EVENT_OFF, "turned off");
+    _fireEvent(EVENT_OFF);
 }
 
 void chrDisp::on() {
@@ -44,7 +44,7 @@ void chrDisp::on() {
         if (_hwPower) { _hwPower(true); }
 
         _isOn = true;
-        _fireEvent(EVENT_ON, "turned on");
+        _fireEvent(EVENT_ON);
     }
     
     dim(false);
@@ -57,7 +57,7 @@ void chrDisp::dim(bool dim_on) {
     if (_hwDimming) { _hwDimming(dim_on); }
 
     _isDimmed = dim_on;
-    _fireEvent(EVENT_NOTICE, _isDimmed ? "dim on" : "dim off");
+    _fireEvent(EVENT_DIM);
 }
 
 bool chrDisp::invert(bool invert_on) {
@@ -67,7 +67,7 @@ bool chrDisp::invert(bool invert_on) {
         _hwInvert(invert_on);
 
         _isInverted = invert_on;
-        _fireEvent(EVENT_NOTICE, _isInverted ? "invert on" : "invert off");
+        _fireEvent(EVENT_INVERT);
     }
 
     return _isInverted == invert_on;
@@ -100,7 +100,7 @@ void chrDisp::setBlinkCallback(BlinkCallback cb) {
 void chrDisp::setTurnOff(uint32_t turnOffMs) {
     if (turnOffMs > 0 && turnOffMs < MIN_TURN_OFF_MS) {
         turnOffMs = MIN_TURN_OFF_MS;
-        _fireEvent(EVENT_NOTICE, "default turnoff min time used");
+        _fireEvent(EVENT_NOTICE);
     }
 
     _turnOffMs = turnOffMs;
@@ -110,17 +110,22 @@ bool chrDisp::isOn() {
     return _isOn;
 }
 
+bool chrDisp::isDimmed() {
+    return _isDimmed;
+}
+
+bool chrDisp::isInverted() {
+    return _isInverted;
+}
+
+
 uint32_t chrDisp::getTurnOffMs() {
     return _turnOffMs;
 }
 
-void chrDisp::_fireEvent(int8_t code, const char* action) {
+void chrDisp::_fireEvent(EventCode code) {
     if (!_onEvent) return;
-
-    char msg[48];
-    snprintf(msg, sizeof(msg), "disp [%u] %s", _id, action);
-    
-    _onEvent(code, msg);
+    _onEvent(code, _id);
 }
 
 void chrDisp::_drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert, uint8_t frame) {
@@ -610,7 +615,7 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
 bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const DisplayItem* items, uint8_t itemCount, bool invertDisplay, bool clearDisplay) {
     if (_gfx == nullptr) {
         if (_firstLoop) {
-            _fireEvent(chrDisp::EVENT_ERR, "GFX obj not initialized");
+            _fireEvent(chrDisp::EVENT_ERR);
         }
         _firstLoop = false;
 
@@ -720,7 +725,7 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
     }
     if (refreshed) {
         _lastRedrawMillis = now;
-        _fireEvent(EVENT_REFRESHED, "refreshed");
+        _fireEvent(EVENT_REFRESHED);
     }
     return refreshed;
 }
@@ -732,4 +737,19 @@ bool chrDisp::loop(bool turnOnResetSleep, const char* text, uint8_t size, bool i
 
 bool chrDisp::loop(bool turnOnResetSleep) {
     return loop(turnOnResetSleep, _lastAutoBlinkItems != nullptr && _lastAutoBlinkItemsCount > 0, (const DisplayItem*)nullptr, 0);   // Ha van elmentett AutoBlinkItems, megtartja
+}
+
+const char* chrDisp::eventName(EventCode code) {
+    switch (code) {
+        case EVENT_ERR:           return "GFX obj not initialized";
+        case EVENT_WARN:          return "warning";
+        case EVENT_OK:            return "ok";
+        case EVENT_NOTICE:        return "default turnoff time used";
+        case EVENT_DIM:            return "dim";
+        case EVENT_INVERT:         return "invert";
+        case EVENT_ON:            return "on";
+        case EVENT_OFF:           return "off";
+        case EVENT_REFRESHED:     return "refreshed";
+    }
+    return "unknown";
 }

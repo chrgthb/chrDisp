@@ -42,8 +42,11 @@ Example initialization flow with an SSD1306 OLED display:
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 chrDisp myDisp(&display, 10000); // 10 second auto turn-off timeout
 
-void onDispEvent(int8_t code, const char* msg) {
-	Serial.printf("event=%d msg=%s\n", code, msg ? msg : "null");
+void onDispEvent(int8_t code, uint8_t displayId) {
+	Serial.printf("display=%u event=%s (%d)\n",
+	              static_cast<unsigned>(displayId),
+	              myDisp.eventName(static_cast<chrDisp::EventCode>(code)),
+	              code);
 }
 
 void hwUpdate() {
@@ -68,7 +71,7 @@ void loop() {
 
 ## API Reference (chrDisp Class)
 
-Public methods declared in [chrDisp.h](chrDisp.h):
+Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 
 - `chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs = 10000, uint16_t fgColor = 0xFFFF, uint16_t bgColor = 0x0000, uint8_t id = 0)`
 	- Constructor initializing display pointer, sleep timeout, foreground/background colors, and display instance ID.
@@ -99,7 +102,9 @@ Public methods declared in [chrDisp.h](chrDisp.h):
 - `bool loop(bool turnOnResetSleep)`
 	- Overloaded loop helper to refresh display state using previously stored auto-blink items.
 - `void setEventCallback(EventCallback cb)`
-	- Registers global event callback.
+	- Registers a callback receiving the event code and display ID. The callback no longer receives a formatted message string; use `eventName()` when a readable label is needed.
+- `const char* eventName(EventCode code)`
+	- Returns a readable event name from the event code, without formatting or allocating a message.
 - `void setBlinkCallback(BlinkCallback cb)`
 	- Registers blink callback.
 - `void setTurnOff(uint32_t turnOffMs)`
@@ -152,21 +157,16 @@ struct DisplayItem {
 `chrDisp::EventCode` values:
 
 - `EVENT_ERR = -10`
-- `EVENT_WARN = -1`
+- `EVENT_WARN = -5`
 - `EVENT_OK = 0`
 - `EVENT_NOTICE = 10`
-- `EVENT_ON = 12`
-- `EVENT_OFF = 14`
-- `EVENT_REFRESHED = 16`
+- `EVENT_DIM = 12`
+- `EVENT_INVERT = 14`
+- `EVENT_ON = 20`
+- `EVENT_OFF = 25`
+- `EVENT_REFRESHED = 30`
 
-Typical event log messages include:
-
-- `disp [0] turned on`
-- `disp [0] turned off`
-- `disp [0] dim on`
-- `disp [0] dim off`
-- `disp [0] refreshed`
-- `disp [0] GFX obj not initialized`
+Use `eventName(EventCode)` to map an event code to a static, human-readable name without constructing or copying a formatted message. The event callback receives `(int8_t code, uint8_t displayId)`.
 
 ## Build
 

@@ -6,18 +6,20 @@
 
 class chrDisp {
 public:
-    using EventCallback = std::function<void(int8_t, const char*)>; // Event callback: parameters are event code and message
+    using EventCallback = std::function<void(int8_t, uint8_t)>; // Event callback: parameters are event code and display ID
     using BlinkCallback = std::function<void(uint8_t, uint8_t)>; // Blink callback: parameters are display ID and blink quarter
 
     // Event codes
     enum EventCode {
         EVENT_ERR = -10,
-        EVENT_WARN = -1,
+        EVENT_WARN = -5,
         EVENT_OK = 0,
         EVENT_NOTICE = 10,
-        EVENT_ON = 12,
-        EVENT_OFF = 14,
-        EVENT_REFRESHED = 16
+        EVENT_DIM = 12,
+        EVENT_INVERT = 14,
+        EVENT_ON = 20,
+        EVENT_OFF = 25,
+        EVENT_REFRESHED = 30
     };
 
     // Types of displayable items
@@ -95,6 +97,8 @@ public:
     void setBlinkCallback(BlinkCallback cb);
     void setTurnOff(uint32_t turnOffMs);
     bool isOn();
+    bool isDimmed();
+    bool isInverted();
     uint32_t getTurnOffMs();
     
     void drawVBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
@@ -130,6 +134,8 @@ public:
             (this->*DRAW_FUNCTIONS[type])(x, y, w, h, blink, invert, frame, val);
         }
     }
+
+    const char* eventName(EventCode code);
 
 
 private:
@@ -170,5 +176,5 @@ private:
     void _drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0);
     void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, uint8_t width = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0);
     // Internal event handler
-    void _fireEvent(int8_t code, const char* action);
+    void _fireEvent(EventCode code);
 };

@@ -32,9 +32,11 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 chrDisp myDisp(&display, 15000, 1, 0, 1);
 
 // Event handler callback function
-void dispEventHandler(int8_t code, const char* msg) {
+void dispEventHandler(int8_t code, uint8_t displayId) {
     // Log events to the serial port
-    Serial.printf("[chrDisp Event] Code: %d | Msg: %s\n", code, msg);
+    Serial.printf("[chrDisp Event] Display: %u | Code: %d | Event: %s\n",
+                  static_cast<unsigned>(displayId), code,
+                  myDisp.eventName(static_cast<chrDisp::EventCode>(code)));
 }
 
 void setup() {
