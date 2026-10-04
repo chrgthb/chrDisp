@@ -84,6 +84,8 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 	- Constructor initializing display pointer, sleep timeout, the maximum number of display items, the maximum text / skipChars length per item (buffers are allocated once here), foreground/background colors, and display instance ID. The object is not copyable.
 - `bool setDisplayItem(uint8_t index, const DisplayItem& item)`
 	- Copies the item (including text and skipChars, truncated to the configured maximums) into slot `index` and marks it for redraw. Returns `false` if `index` is out of range.
+- `DisplayItem* editDisplayItem(uint8_t index)`
+	- Low-cost in-place modification: returns a pointer to the stored item (no copy) and marks it for redraw. Returns `nullptr` if `index` is out of range. Cleared items stay cleared; use `setDisplayItem()` to show them again. `text` and `skipChars` point to fixed buffers (`maxTextLen + 1` / `maxSkipCharsLen + 1` bytes): write them with `strlcpy()` and never reassign the pointers.
 - `bool clearDisplayItem(uint8_t index)`
 	- Marks the item to be erased from the screen on the next `loop()`. Returns `false` if `index` is out of range.
 - `void setHwUpdateCallback(HardwareAction cb)`
@@ -160,6 +162,15 @@ struct DisplayItem {
     uint8_t data = 0;
     ItemStates state = ITEM_CLEARED; // managed by the library
 };
+```
+
+Existing items can be changed cheaply with `editDisplayItem()`:
+
+```cpp
+if (chrDisp::DisplayItem* it = myDisp.editDisplayItem(0)) {
+    strlcpy(it->text, "Updated", 13); // 12 = maxTextLen in the Quick Start
+    it->blink = 0b11110000;
+}
 ```
 
 ## Event Codes

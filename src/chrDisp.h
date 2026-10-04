@@ -89,6 +89,10 @@ public:
     void setHwInvertCallback(HardwareBoolAction cb) { _hwInvert = cb; } // e.g., invertDisplay()
 
     bool setDisplayItem(uint8_t index, const DisplayItem& item);
+    // Direct access for in-place modification (no copy); marks a visible item for redraw
+    // - text/skipChars point to fixed buffers (maxTextLen/maxSkipCharsLen + 1), write them with strlcpy, don't reassign
+    // - returns nullptr if the index is invalid; cleared items stay cleared (use setDisplayItem to show them again)
+    DisplayItem* editDisplayItem(uint8_t index);
     bool clearDisplayItem(uint8_t index);
     void setColors(uint16_t fg, uint16_t bg);
     void off();

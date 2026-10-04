@@ -132,6 +132,15 @@ void loop() {
         Serial.println("Simulated user activity (wakeup)!");
     }
 
+    // Every 3 seconds update the battery icon in place (no item copy, auto-marked for redraw)
+    static uint32_t lastEdit = 0;
+    if (millis() - lastEdit > 3000) {
+        lastEdit = millis();
+        if (chrDisp::DisplayItem* bat = myDisp.editDisplayItem(1)) {
+            bat->data = (bat->data >= 100) ? 0 : bat->data + 25;
+        }
+    }
+
     // Call main logic loop; stored items are redrawn only when they changed or blink
     // Parameters: (wakeUp, invert_display, clear_screen_before)
     myDisp.loop(userActivityDetected, false, false);

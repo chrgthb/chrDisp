@@ -82,6 +82,13 @@ bool chrDisp::setDisplayItem(uint8_t index, const DisplayItem& item) {
     return true;
 }
 
+chrDisp::DisplayItem* chrDisp::editDisplayItem(uint8_t index) {
+    if (index >= _maxDisplayItems || _items == nullptr) return nullptr;
+
+    if (_items[index].state == ITEM_NORMAL) _items[index].state = ITEM_NEEDS_REDRAW;
+    return &_items[index];
+}
+
 bool chrDisp::clearDisplayItem(uint8_t index) {
     if (index >= _maxDisplayItems || _items == nullptr) return false;
     _items[index].state = ITEM_TO_CLEAR;
