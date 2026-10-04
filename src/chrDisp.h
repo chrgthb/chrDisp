@@ -37,11 +37,19 @@ public:
         ITEM_COUNT
     };
 
+    enum ItemStates {
+        ITEM_TO_CLEAR = -2,         // (set by clearDisplayItem) Item needs to be cleared from the screen
+        ITEM_CLEARED = -1,          // (set by clearDisplayItem) Item has been cleared from the screen
+        ITEM_NORMAL = 0,            // (loop will check it) Item doesn't changed, need only redraw if it is blinking
+        ITEM_NEEDS_REDRAW = 1       // (set by setDisplayItem) Item needs to be redrawn
+    };
+
     // Properties of displayable items
+    // - clearDisplayItem set needRedraw to -1, so it will be cleared from the screen, set to 0 and won't be redisplayed
     struct DisplayItem {
-        const char* text = nullptr; // Text to display (not relevant for icons)
+        char* text = nullptr;       // Text to display (not relevant for icons)
         uint8_t size = 2;           // Font size for text, height in pixels for icons
-        uint8_t width = 0;          // For icons
+        uint16_t width = 0;         // For icons
                                     // - if set for text and text is smaller then given width, text will be centered within the width
         int16_t x = 0;
         int16_t y = 0;
@@ -53,17 +61,21 @@ public:
                                     // - negative numbers indicate inversion of every 2nd, 3rd, 4th character respectively
         uint8_t blink = 0b11111111; // In which quarter of the blinking the item should appear on the display (max 8 quarters)
         int16_t blinkChar = 0;      // For texts: blink characters with the same method like inversion works for texts (but 0 and -1 means the same, a fully blinking text)
-        const char* skipChars = nullptr; // Characters to ignore during blinking or inversion (you can set for eg. space or new line chars if they just separate text parts)
+        char* skipChars = nullptr;  // Characters to ignore during blinking or inversion (you can set for eg. space or new line chars if they just separate text parts)
         uint8_t frame = 0;          // A button like rounded rect around the item
                                     // - numbers mean the thickness of the frame
                                     // - if color off the frame equals to background, it will be a rounded rectangle with foreground color
                                     // - else it will be a filled rounded rectangle
                                     // - FRAMES WON'T BLINK automatically
         uint8_t data = 0;           // Percent or level for icons
+        ItemStates state = ITEM_CLEARED; // Current state of the item (normal, needs redraw, to clear, cleared)
     };
 
     // Constructor: expects a GFX pointer
-    chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs = 10000, uint16_t fgColor = 0xFFFF, uint16_t bgColor = 0x0000, uint8_t id = 0);
+    chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs = 10000, uint8_t maxDisplayItems = 0, uint8_t maxTextLen = 0, uint8_t maxSkipCharsLen = 0, uint16_t fgColor = 0xFFFF, uint16_t bgColor = 0x0000, uint8_t id = 0);
+    ~chrDisp();
+    chrDisp(const chrDisp&) = delete;               // Owns raw buffers
+    chrDisp& operator=(const chrDisp&) = delete;
 
     // Types of hardware actions
     using HardwareAction = std::function<void()>;
@@ -76,6 +88,8 @@ public:
     void setHwDimCallback(HardwareBoolAction cb) { _hwDimming = cb; }   // e.g., dim() command
     void setHwInvertCallback(HardwareBoolAction cb) { _hwInvert = cb; } // e.g., invertDisplay()
 
+    bool setDisplayItem(uint8_t index, const DisplayItem& item);
+    bool clearDisplayItem(uint8_t index);
     void setColors(uint16_t fg, uint16_t bg);
     void off();
     void on();
@@ -88,10 +102,8 @@ public:
 
     // In every loop() (automatically handles on / off)
     // - return value is true if there was a write to the display
-    // - allowStoreForAutoBlink, if true: if items is not nullptr, the pointer and size of items are stored (the memory content must be accessible!), in this case, during blinking, there is no need to resend the items, the function itself handles it
-    bool loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const DisplayItem* items, uint8_t itemCount = 0, bool invertDisplay = false, bool clearDisplay = true);
+    bool loop(bool turnOnResetSleep, bool invertDisplay = false, bool clearDisplay = true);
     bool loop(bool turnOnResetSleep, const char* text, uint8_t size = 2, bool invertDisplay = false, bool clearDisplay = true);
-    bool loop(bool turnOnResetSleep);   // loop(true, nullptr); in this case the compiler would not know which loop() method to call, so this can also be used or the type must be specified, e.g   .: (const MyDisplayTextItem*)nullptr
 
     void setEventCallback(EventCallback cb);
     void setBlinkCallback(BlinkCallback cb);
@@ -140,6 +152,10 @@ public:
 
 private:
     Adafruit_GFX* _gfx;
+    DisplayItem* _items;
+    uint8_t _maxDisplayItems;
+    uint8_t _maxTextLen;
+    uint8_t _maxSkipCharsLen;
     
     // Hardware callbacks
     HardwareAction _hwUpdate = nullptr;
@@ -155,15 +171,12 @@ private:
     bool _isOn;
     bool _isDimmed;
     bool _isInverted;
-    bool _needRedraw;
     uint32_t _lastRedrawMillis;
     uint32_t _lastOnMillis;
     EventCallback _onEvent;
     BlinkCallback _onBlink;
     uint8_t _blinkQuarter;  // counts 0-7 (1/4 - 8/4)
     uint32_t _blinkQuarterChangedMillis;
-    const DisplayItem* _lastAutoBlinkItems;
-    uint8_t _lastAutoBlinkItemsCount;
     bool _firstLoop;
     
     static constexpr uint16_t BLINK_INTERVAL_MS = 250;
@@ -175,6 +188,7 @@ private:
     void _drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0, bool batteryTip = false);
     void _drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0);
     void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, uint8_t width = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0);
+    bool _loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDisplay, const char* text, uint8_t textSize);
     // Internal event handler
     void _fireEvent(EventCode code);
 };

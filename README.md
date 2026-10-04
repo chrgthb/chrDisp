@@ -19,7 +19,8 @@ The library targets the Arduino framework and works with any display driver comp
 - Flexible hardware callbacks for display driver operations (`hwUpdate`, `hwClear`, `hwPower`, `hwDimming`, `hwInvert`)
 - Rich set of built-in UI elements and vector icons
 - Character-level and item-level blinking (using 8-bit phase bitmasks) and inversion options
-- Efficient auto-blinking storage to handle blinking phases without redundant redrawing overhead in the main loop
+- Efficient item storage: items are copied into library-owned buffers and redrawn only when changed or blinking
+- Programmer-defined limits (max items, max text length, max skipChars length) allocated once in the constructor, no dangling pointers
 
 ## Dependency
 
@@ -40,7 +41,8 @@ Example initialization flow with an SSD1306 OLED display:
 #include "chrDisp.h"
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
-chrDisp myDisp(&display, 10000); // 10 second auto turn-off timeout
+// 10 s auto turn-off, room for 2 items, max 12 characters per text
+chrDisp myDisp(&display, 10000, 2, 12);
 
 void onDispEvent(int8_t code, uint8_t displayId) {
 	Serial.printf("display=%u event=%s (%d)\n",
@@ -60,12 +62,17 @@ void setup() {
 	myDisp.setEventCallback(onDispEvent);
 	myDisp.setHwUpdateCallback(hwUpdate);
 
+	chrDisp::DisplayItem item;
+	char text[] = "Hello World!";
+	item.text = text; // copied into the library's own buffer
+	myDisp.setDisplayItem(0, item);
+
 	myDisp.on();
 }
 
 void loop() {
 	bool userActivity = false; // Set to true on button press or user interaction
-	myDisp.loop(userActivity, "Hello World!", 2, false, true);
+	myDisp.loop(userActivity, false, false);
 }
 ```
 
@@ -73,8 +80,12 @@ void loop() {
 
 Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 
-- `chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs = 10000, uint16_t fgColor = 0xFFFF, uint16_t bgColor = 0x0000, uint8_t id = 0)`
-	- Constructor initializing display pointer, sleep timeout, foreground/background colors, and display instance ID.
+- `chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs = 10000, uint8_t maxDisplayItems = 0, uint8_t maxTextLen = 0, uint8_t maxSkipCharsLen = 0, uint16_t fgColor = 0xFFFF, uint16_t bgColor = 0x0000, uint8_t id = 0)`
+	- Constructor initializing display pointer, sleep timeout, the maximum number of display items, the maximum text / skipChars length per item (buffers are allocated once here), foreground/background colors, and display instance ID. The object is not copyable.
+- `bool setDisplayItem(uint8_t index, const DisplayItem& item)`
+	- Copies the item (including text and skipChars, truncated to the configured maximums) into slot `index` and marks it for redraw. Returns `false` if `index` is out of range.
+- `bool clearDisplayItem(uint8_t index)`
+	- Marks the item to be erased from the screen on the next `loop()`. Returns `false` if `index` is out of range.
 - `void setHwUpdateCallback(HardwareAction cb)`
 	- Registers callback for updating/flushing the display hardware (e.g., `display.display()`).
 - `void setHwClearCallback(HardwareAction cb)`
@@ -95,12 +106,10 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 	- Controls dimming state manually.
 - `void clear()`
 	- Clears display buffer using hardware callback or fills with background color as fallback.
-- `bool loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const DisplayItem* items, uint8_t itemCount = 0, bool invertDisplay = false, bool clearDisplay = true)`
-	- Main execution loop; renders display items, evaluates sleep/dimming timers, and handles blinking phases.
+- `bool loop(bool turnOnResetSleep, bool invertDisplay = false, bool clearDisplay = true)`
+	- Main execution loop; evaluates sleep/dimming timers, handles blinking phases and draws the stored display items. With `clearDisplay = true` the screen is cleared and all items are redrawn; otherwise only changed or blinking items are redrawn.
 - `bool loop(bool turnOnResetSleep, const char* text, uint8_t size = 2, bool invertDisplay = false, bool clearDisplay = true)`
-	- Overloaded loop helper for rendering simple text strings.
-- `bool loop(bool turnOnResetSleep)`
-	- Overloaded loop helper to refresh display state using previously stored auto-blink items.
+	- Same as above, additionally drawing a simple text at the top-left corner.
 - `void setEventCallback(EventCallback cb)`
 	- Registers a callback receiving the event code and display ID. The callback no longer receives a formatted message string; use `eventName()` when a readable label is needed.
 - `const char* eventName(EventCode code)`
@@ -133,22 +142,23 @@ Supported `ItemTypes`:
 - `ITEM_AP = 7`
 - `ITEM_POTMETER = 8`
 
-Items are passed using the `DisplayItem` struct:
+Items are set with `setDisplayItem()` using the `DisplayItem` struct (the `text` and `skipChars` pointers are only read during the call):
 
 ```cpp
 struct DisplayItem {
-    const char* text = nullptr;
+    char* text = nullptr;
     uint8_t size = 2;
-    uint8_t width = 0;
+    uint16_t width = 0;
     int16_t x = 0;
     int16_t y = 0;
     ItemTypes type = ITEM_TEXT;
     int16_t invert = 0;
     uint8_t blink = 0b11111111;
     int16_t blinkChar = 0;
-    const char* skipChars = nullptr;
+    char* skipChars = nullptr;
     uint8_t frame = 0;
     uint8_t data = 0;
+    ItemStates state = ITEM_CLEARED; // managed by the library
 };
 ```
 

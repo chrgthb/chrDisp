@@ -1,28 +1,91 @@
 #include "chrDisp.h"
 #include <cmath>
 
-chrDisp::chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs, uint16_t fgColor, uint16_t bgColor, uint8_t id) 
-    : _gfx(gfx),
+chrDisp::chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs, uint8_t maxDisplayItems, uint8_t maxTextLen, uint8_t maxSkipCharsLen, uint16_t fgColor, uint16_t bgColor, uint8_t id) 
+: _gfx(gfx),
+      _items(nullptr),
+      _maxDisplayItems(maxDisplayItems),
+      _maxTextLen(maxTextLen),
+      _maxSkipCharsLen(maxSkipCharsLen),
       _id(id),
-//      _turnOffMs(turnOffMs),
       _fgColor(fgColor),
       _bgColor(bgColor),
       _isOn(false),
       _isDimmed(false),
       _isInverted(false),
-      _needRedraw(false),
       _lastRedrawMillis(0),
       _lastOnMillis(0),
       _onEvent(nullptr),
       _onBlink(nullptr),
       _blinkQuarter(0),
       _blinkQuarterChangedMillis(0),
-      _lastAutoBlinkItems(nullptr),
-      _lastAutoBlinkItemsCount(0),
       _firstLoop(true)
 {
     chrDisp::setTurnOff(turnOffMs);
     if (_gfx != nullptr) _gfx->cp437(true);
+
+    // Dinamically allocate display items based on the maximum number of display items
+    if (_maxDisplayItems > 0) {
+        _items = new DisplayItem[_maxDisplayItems];
+        
+        for (uint8_t i = 0; i < _maxDisplayItems; i++) {
+            _items[i].text = (_maxTextLen > 0) ? new char[_maxTextLen + 1]{0} : nullptr;
+            _items[i].skipChars = (_maxSkipCharsLen > 0) ? new char[_maxSkipCharsLen + 1]{0} : nullptr;
+        }
+    }
+}
+
+chrDisp::~chrDisp() {
+    // Free dynamically allocated display items
+    if (_items != nullptr) {
+        for (uint8_t i = 0; i < _maxDisplayItems; i++) {
+            if (_items[i].text != nullptr) {
+                delete[] _items[i].text;
+            }
+            if (_items[i].skipChars != nullptr) {
+                delete[] _items[i].skipChars;
+            }
+        }
+        delete[] _items;
+        _items = nullptr;
+    }
+}
+
+bool chrDisp::setDisplayItem(uint8_t index, const DisplayItem& item) {
+    if (index >= _maxDisplayItems || _items == nullptr) return false;
+
+    // Save pointers to avoid overwriting them during structure copy
+    char* destText = _items[index].text;
+    char* destSkip = _items[index].skipChars;
+
+    // Datacopy (the base data copy, this will temporarily overwrite the pointers with the incoming ones)
+    _items[index] = item; 
+
+    // Restore pointers to our allocated memory area
+    _items[index].text = destText;
+    _items[index].skipChars = destSkip;
+
+    // Safe copy of text strings (deep copy)
+    if (_items[index].text != nullptr && item.text != nullptr) {
+        strlcpy(_items[index].text, item.text, _maxTextLen + 1);
+    } else if (_items[index].text != nullptr) {
+        _items[index].text[0] = '\0'; // Temporary clear if nullptr came
+    }
+
+    if (_items[index].skipChars != nullptr && item.skipChars != nullptr) {
+        strlcpy(_items[index].skipChars, item.skipChars, _maxSkipCharsLen + 1);
+    } else if (_items[index].skipChars != nullptr) {
+        _items[index].skipChars[0] = '\0'; // Temporary clear if nullptr came
+    }
+
+    _items[index].state = ITEM_NEEDS_REDRAW;
+    return true;
+}
+
+bool chrDisp::clearDisplayItem(uint8_t index) {
+    if (index >= _maxDisplayItems || _items == nullptr) return false;
+    _items[index].state = ITEM_TO_CLEAR;
+    return true;
 }
 
 void chrDisp::setColors(uint16_t fg, uint16_t bg) {
@@ -70,7 +133,7 @@ bool chrDisp::invert(bool invert_on) {
         _fireEvent(EVENT_INVERT);
     }
 
-    return _isInverted == invert_on;
+    return true;
 }
 
 void chrDisp::clear() {
@@ -221,7 +284,6 @@ void chrDisp::_drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint1
 
 void chrDisp::drawVBar(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -237,7 +299,6 @@ void chrDisp::drawVBar(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
 
 void chrDisp::drawHBar(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -253,7 +314,6 @@ void chrDisp::drawHBar(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
 
 void chrDisp::drawBattery(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -270,7 +330,6 @@ void chrDisp::drawBattery(int16_t x, int16_t y, uint16_t width, uint16_t height,
 void chrDisp::drawCharge(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed) {
     (void)notUsed;
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -324,7 +383,6 @@ void chrDisp::drawCharge(int16_t x, int16_t y, uint16_t width, uint16_t height, 
 void chrDisp::drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed) {
     (void)notUsed;
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -353,7 +411,6 @@ void chrDisp::drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t heigh
 
 void chrDisp::drawDisk(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -402,7 +459,6 @@ void chrDisp::drawDisk(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
 
 void chrDisp::drawWiFi(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -466,7 +522,6 @@ void chrDisp::drawWiFi(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
 void chrDisp::drawAP(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed) {
     (void)notUsed;
     if (_gfx == nullptr) return;
-    _needRedraw = true;
     
     if (frame != 0) {
         _drawFrameHelper(x, y, width, height, invert, frame);
@@ -494,7 +549,6 @@ void chrDisp::drawAP(int16_t x, int16_t y, uint16_t width, uint16_t height, uint
 
 void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPointDeg, uint8_t blink, bool invert, uint8_t frame, uint8_t level) {
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     // Since the base is circular, the height of the area is the same as the width
     uint16_t height = width;
@@ -545,10 +599,9 @@ void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPo
 }
 
 void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, uint8_t width, uint8_t blink, int16_t blinkChar, int16_t invert, const char* skipChars, uint8_t frame) {
-    if (text == nullptr) return;    // Do not draw if the text is null
+    if (text == nullptr || text[0] == '\0') return;    // Do not draw if the text is null
 
     if (_gfx == nullptr) return;
-    _needRedraw = true;
 
     int16_t textX, textY;
     uint16_t textWidth, textHeight;
@@ -564,7 +617,7 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
     if (frame != 0) {
         _drawFrameHelper(textX, textY, textWidth, textHeight, invert, frame);
     } else {
-        // Clear the icon area (square area)
+        // Clear the text area (square area with frame if set)
         _gfx->fillRect(textX, textY, textWidth, textHeight, invert ? _fgColor : _bgColor);
     }
 
@@ -584,7 +637,7 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
     
     uint8_t charCounter = 0;    // For invert and blink count chars which are not skipped
     for (uint16_t i = 0; text[i] != '\0'; ++i) {
-        if (skipChars == nullptr || strchr(skipChars, text[i]) == nullptr) ++charCounter;
+        if (skipChars == nullptr || skipChars[0] == '\0' || strchr(skipChars, text[i]) == nullptr) ++charCounter;
 
         // Determine if this character should be lit or not
         if (noLit
@@ -612,7 +665,16 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
     }
 }
 
-bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const DisplayItem* items, uint8_t itemCount, bool invertDisplay, bool clearDisplay) {
+bool chrDisp::loop(bool turnOnResetSleep, bool invertDisplay, bool clearDisplay) {
+    return _loopImpl(turnOnResetSleep, invertDisplay, clearDisplay, nullptr, 0);
+}
+
+bool chrDisp::loop(bool turnOnResetSleep, const char* text, uint8_t size, bool invertDisplay, bool clearDisplay) {
+    return _loopImpl(turnOnResetSleep, invertDisplay, clearDisplay, text, size);
+}
+
+bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDisplay, const char* text, uint8_t textSize) {
+    // Safety check
     if (_gfx == nullptr) {
         if (_firstLoop) {
             _fireEvent(chrDisp::EVENT_ERR);
@@ -622,22 +684,20 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
         return false;
     }
 
-    if (turnOnResetSleep) on();           // Turn on or just refresh the last turn-on time
-    
+    // Turn on or just refresh the last turn-on time
+    if (turnOnResetSleep) on();
+
+    // Handle automatic turn-off
     uint32_t now = millis();
     if (_isOn && (_turnOffMs > 0) && (now - _lastOnMillis >= _turnOffMs) ) {
         // The valid _turnOffMs has expired, the display can be turned off
         off();
     }
 
-    if (allowStoreForAutoBlink == false && (_lastAutoBlinkItems != nullptr || _lastAutoBlinkItemsCount > 0)) {
-        // Tárolás törlése, ha nem engedélyezett
-        _lastAutoBlinkItems = nullptr;
-        _lastAutoBlinkItemsCount = 0;
-    }
+    // At this point, if the display is not on, there is nothing to do
+    if (!_isOn) return false;
 
-    if (!_isOn) return false;   // Ha ezek után nincs bekapcsolva a kijelző, akkor nincs további teendő
-
+    // Handle dimming
     if (_isOn && (_turnOffMs > DIM_TIME_MS) && (now - _lastOnMillis >= _turnOffMs - DIM_TIME_MS) ) {
         // Only DIM_TIME_MS remains from the valid _turnOffMs, the display can be dimmed
         dim(true);
@@ -656,87 +716,63 @@ bool chrDisp::loop(bool turnOnResetSleep, bool allowStoreForAutoBlink, const Dis
         // Fire the blink callback if it is set
         if (_onBlink) _onBlink(_id, _blinkQuarter);
     }
-    
-    if (items != nullptr && itemCount > 0) {
-      // The screen needs to be redrawn because the user sent the items
-      _needRedraw = true;
-      if (clearDisplay) clear();
 
-      if (allowStoreForAutoBlink) {
-        // Store the data for possible blinking
-        _lastAutoBlinkItems = items;
-        _lastAutoBlinkItemsCount = itemCount;
-      }
-    } else {
-      // It would not be necessary to redraw the screen, but should check if blinking items need to change state
-
-      if (oldBlinkQuarter != _blinkQuarter && _lastAutoBlinkItems != nullptr && _lastAutoBlinkItemsCount > 0) {
-        // There is a previously saved item, the question is whether something needs to blink
-
-        for (uint8_t i = 0; i < _lastAutoBlinkItemsCount; i++) {
-          if (_lastAutoBlinkItems[i].blink != 0b11111111) {
-            // There is an item waiting to blink
-
-            bool currentOn = checkBlinkBit(_lastAutoBlinkItems[i].blink, oldBlinkQuarter);
-            bool nextOn = checkBlinkBit(_lastAutoBlinkItems[i].blink, _blinkQuarter);
-
-            if (currentOn != nextOn) {
-              // The item waiting to blink will now be in a different state than it was, so a redraw is needed
-              _needRedraw = true;
-              if (clearDisplay) clear();
-
-              items = _lastAutoBlinkItems;
-              itemCount = _lastAutoBlinkItemsCount;
-
-              break;
-            }
-          }
-        }
-      }
-    }
-    
+    // Drawing on need
     bool refreshed = false;
-    if (_needRedraw) {
-      // Refresh content
 
-        if (items != nullptr) {
-          for (uint8_t i = 0; i < itemCount; i++) {
-            if (items[i].type == ITEM_TEXT) {
-                _drawTextHelper(items[i].x, items[i].y, items[i].size, items[i].text, items[i].width, items[i].blink, items[i].blinkChar, items[i].invert, items[i].skipChars, items[i].frame);
-            } else {
-                drawItem(items[i].type, items[i].x, items[i].y, items[i].width, items[i].size, items[i].blink, items[i].invert != 0, items[i].frame, items[i].data);
-            }
-          }
-      }
-
-      if (_hwUpdate) { _hwUpdate(); }
-      refreshed = true;
+    if (clearDisplay) {
+        clear();
+        refreshed = true;
     }
+
+    for (uint8_t i = 0; i < _maxDisplayItems; i++) {
+        if (_items[i].state == ITEM_CLEARED) continue;
+
+        // Skip items that do not need to be (re)drawn (a cleared screen needs every item redrawn)
+        if (   !clearDisplay
+            && (_items[i].state != ITEM_TO_CLEAR)
+            && (_items[i].state != ITEM_NEEDS_REDRAW)
+            && ( oldBlinkQuarter == _blinkQuarter)      // normal state and no change in blink state
+        ) continue;
+
+        // If have to clear, set blinkByte and invert accordingly
+        uint8_t blinkByte = _items[i].state == ITEM_TO_CLEAR ? 0b00000000 : _items[i].blink;
+        uint8_t invert = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].invert;
+
+        // Redraw the item based on its type
+        if (_items[i].type == ITEM_TEXT) {
+            int16_t blinkChar = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].blinkChar;
+            _drawTextHelper(_items[i].x, _items[i].y, _items[i].size, _items[i].text, _items[i].width, blinkByte, blinkChar, invert, _items[i].skipChars, _items[i].frame);
+        } else {
+            drawItem(_items[i].type, _items[i].x, _items[i].y, _items[i].width, _items[i].size, blinkByte, invert != 0, _items[i].frame, _items[i].data);
+        }
+        refreshed = true;
+
+        // If the item was set to be cleared, mark it as cleared after drawing
+        _items[i].state = _items[i].state == ITEM_TO_CLEAR ? ITEM_CLEARED : ITEM_NORMAL;
+    }
+
+    // Overlay text of the text-only loop() overload
+    if (text != nullptr && text[0] != '\0') {
+        _drawTextHelper(0, 0, textSize, text, 0, 0b11111111, 0, 0, nullptr, 0);
+        refreshed = true;
+    }
+
+    // Send hardware update have to be earlier than inversion
+    if (refreshed && _hwUpdate) _hwUpdate();
   
-    if (_needRedraw || (now - _lastRedrawMillis > BLINK_INTERVAL_MS)) {
-      // Inversion is only performed at BLINK_INTERVAL_MS intervals; if the screen did not need to be refreshed, this ensures that calling the loop with true once and then immediately with false will invert the screen for at least BLINK_INTERVAL_MS
-      if (invert(invertDisplay)) {
-          refreshed = true;
-      }
+    if ( _isInverted != invertDisplay && (now - _lastRedrawMillis > BLINK_INTERVAL_MS)) {
+        // Inversion is only performed at BLINK_INTERVAL_MS intervals; if the screen did not need to be refreshed, this ensures that calling the loop with true once and then immediately with false will invert the screen for at least BLINK_INTERVAL_MS
+        if (invert(invertDisplay)) {
+            refreshed = true;
+        }
     }
 
-    if (_needRedraw) {
-      _needRedraw = false;
-    }
     if (refreshed) {
         _lastRedrawMillis = now;
         _fireEvent(EVENT_REFRESHED);
     }
     return refreshed;
-}
-
-bool chrDisp::loop(bool turnOnResetSleep, const char* text, uint8_t size, bool invertDisplay, bool clearDisplay) {
-    DisplayItem items[1] = { text, size };
-    return loop(turnOnResetSleep, false, items, 1, invertDisplay, clearDisplay);
-}
-
-bool chrDisp::loop(bool turnOnResetSleep) {
-    return loop(turnOnResetSleep, _lastAutoBlinkItems != nullptr && _lastAutoBlinkItemsCount > 0, (const DisplayItem*)nullptr, 0);   // Ha van elmentett AutoBlinkItems, megtartja
 }
 
 const char* chrDisp::eventName(EventCode code) {
