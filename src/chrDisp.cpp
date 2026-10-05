@@ -737,7 +737,7 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
 
         // If have to clear, set blinkByte and invert accordingly
         uint8_t blinkByte = _items[i].state == ITEM_TO_CLEAR ? 0b00000000 : _items[i].blink;
-        uint8_t invert = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].invert;
+        int16_t invert = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].invert;
 
         // Redraw the item based on its type
         if (_items[i].type == ITEM_TEXT) {
