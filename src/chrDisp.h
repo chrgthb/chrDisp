@@ -47,9 +47,11 @@ public:
     // Properties of displayable items
     // - clearDisplayItem set needRedraw to -1, so it will be cleared from the screen, set to 0 and won't be redisplayed
     struct ItemProps {
-        uint8_t size = 2;           // Font size for text, height in pixels for icons
-        uint16_t width = 0;         // For icons
-                                    // - if set for text and text is smaller then given width, text will be centered within the width
+        uint8_t size = 1;           // Font size for text
+        int16_t width = 0;          // If set for text and text is narrower, text will be centered within the width
+                                    // - if width < 0 and text is narrower, text will be aligned right
+        uint16_t height = 0;        // Height in pixels for icons or text (text will be positioned to center of the height)
+        uint16_t zeroPointDeg = 0;  // Starting angle for ITEM_POTMETER
         int16_t x = 0;
         int16_t y = 0;
         ItemTypes type = ITEM_TEXT;
@@ -117,7 +119,7 @@ public:
     // In every loop() (automatically handles on / off)
     // - return value is true if there was a write to the display
     bool loop(bool turnOnResetSleep, bool invertDisplay = false, bool clearDisplay = true);
-    bool loop(bool turnOnResetSleep, const char* text, uint8_t size = 2, bool invertDisplay = false, bool clearDisplay = true);
+    bool loop(bool turnOnResetSleep, const char* text, uint8_t size = 1, bool invertDisplay = false, bool clearDisplay = true);
 
     void setEventCallback(EventCallback cb);
     void setBlinkCallback(BlinkCallback cb);
@@ -201,7 +203,7 @@ private:
     void _drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t frame = 0);
     void _drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0, bool batteryTip = false);
     void _drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0);
-    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, uint8_t width = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0);
+    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width = 0, uint16_t height = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0);
     bool _loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDisplay, const char* text, uint8_t textSize);
     // Internal event handler
     void _fireEvent(EventCode code);

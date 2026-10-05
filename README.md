@@ -109,7 +109,7 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 	- Clears display buffer using hardware callback or fills with background color as fallback.
 - `bool loop(bool turnOnResetSleep, bool invertDisplay = false, bool clearDisplay = true)`
 	- Main execution loop; evaluates sleep/dimming timers, handles blinking phases and draws the stored display items. With `clearDisplay = true` the screen is cleared and all items are redrawn; otherwise only changed or blinking items are redrawn.
-- `bool loop(bool turnOnResetSleep, const char* text, uint8_t size = 2, bool invertDisplay = false, bool clearDisplay = true)`
+- `bool loop(bool turnOnResetSleep, const char* text, uint8_t size = 1, bool invertDisplay = false, bool clearDisplay = true)`
 	- Same as above, additionally drawing a simple text at the top-left corner.
 - `void setEventCallback(EventCallback cb)`
 	- Registers a callback receiving the event code and display ID. The callback no longer receives a formatted message string; use `eventName()` when a readable label is needed.
@@ -147,8 +147,10 @@ Items are set with `setDisplayItem()` using the `ConstDisplayItem` struct (`text
 
 ```cpp
 struct ItemProps {              // common part of ConstDisplayItem and DisplayItem
-    uint8_t size = 2;
-    uint16_t width = 0;
+    uint8_t size = 1;
+    int16_t width = 0;
+    uint16_t height = 0;
+    uint16_t zeroPointDeg = 0;
     int16_t x = 0;
     int16_t y = 0;
     ItemTypes type = ITEM_TEXT;
@@ -169,6 +171,19 @@ struct DisplayItem : ItemProps {        // stored item, edited in place
     char* text = nullptr;
     char* skipChars = nullptr;
 };
+```
+
+`size` controls the font scale for text items and defaults to `1`. Icons use `width` and `height` as their pixel dimensions; the circular potmeter uses `width` for its diameter and `zeroPointDeg` for its starting angle. For text, a positive `width` centers narrower text in that width, while a negative `width` right-aligns it within the absolute width. A nonzero `height` expands the text clearing area or frame to at least that height and vertically centers the text in it. Zero width or height leaves that dimension at the text's natural size.
+
+For example, a text item with `width = -80`, `height = 16`, and `frame = 1` is right-aligned in an 80-pixel-wide framed area, with text centered vertically:
+
+```cpp
+chrDisp::ConstDisplayItem label;
+label.text = "Status";
+label.width = -80;
+label.height = 16;
+label.frame = 1;
+myDisp.setDisplayItem(0, label);
 ```
 
 Existing items can be changed cheaply with `editDisplayItem()`:

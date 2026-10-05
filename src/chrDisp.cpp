@@ -600,7 +600,7 @@ void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPo
     _gfx->drawLine(centerX, centerY, endX, endY, color);
 }
 
-void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, uint8_t width, uint8_t blink, int16_t blinkChar, int16_t invert, const char* skipChars, uint8_t frame) {
+void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width, uint16_t height, uint8_t blink, int16_t blinkChar, int16_t invert, const char* skipChars, uint8_t frame) {
     if (text == nullptr || text[0] == '\0') return;    // Do not draw if the text is null
 
     if (_gfx == nullptr) return;
@@ -610,10 +610,24 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
     _gfx->setTextSize(size);
     _gfx->getTextBounds(text, x, y, &textX, &textY, &textWidth, &textHeight);
 
-    if (width > 0 && textWidth < width) {
-        // Center the text within the given width if it's smaller than the width
-        x += (width - textWidth) / 2;
-        textWidth = width;  // Increase the frame or fillRect width to match the specified width
+    bool rightAlign = width < 0;
+    uint16_t areaWidth = width < 0
+        ? static_cast<uint16_t>(-static_cast<int32_t>(width))
+        : static_cast<uint16_t>(width);
+    if (areaWidth != 0 && textWidth < areaWidth) {
+        if (!rightAlign) {
+            // Center the text within the given width if it's smaller than the width
+            x += (areaWidth - textWidth) / 2;
+        } else {
+            // Right-align the text within the given width if it's smaller than the width
+            x += areaWidth - textWidth;
+        }
+        textWidth = areaWidth;  // Increase the frame or fillRect width to match the specified width
+    }
+
+    if (textHeight < height) {
+        y += (height - textHeight) / 2;
+        textHeight = height;  // Increase the text height to match the specified height
     }
 
     bool fullInvert = invert == -1;
@@ -742,9 +756,12 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
         // Redraw the item based on its type
         if (_items[i].type == ITEM_TEXT) {
             int16_t blinkChar = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].blinkChar;
-            _drawTextHelper(_items[i].x, _items[i].y, _items[i].size, _items[i].text, _items[i].width, blinkByte, blinkChar, invert, _items[i].skipChars, _items[i].frame);
+            _drawTextHelper(_items[i].x, _items[i].y, _items[i].size, _items[i].text, _items[i].width, _items[i].height, blinkByte, blinkChar, invert, _items[i].skipChars, _items[i].frame);
         } else {
-            drawItem(_items[i].type, _items[i].x, _items[i].y, _items[i].width, _items[i].size, blinkByte, invert != 0, _items[i].frame, _items[i].data);
+            if (_items[i].width > 0) { // Safety, texts can have width <= 0
+                uint16_t secondDimension = _items[i].type == ITEM_POTMETER ? _items[i].zeroPointDeg : _items[i].height;
+                drawItem(_items[i].type, _items[i].x, _items[i].y, _items[i].width, secondDimension, blinkByte, invert != 0, _items[i].frame, _items[i].data);
+            }
         }
         refreshed = true;
 
@@ -755,7 +772,7 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
 
     // Overlay text of the text-only loop() overload
     if (text != nullptr && text[0] != '\0') {
-        _drawTextHelper(0, 0, textSize, text, 0, 0b11111111, 0, 0, nullptr, 0);
+        _drawTextHelper(0, 0, textSize, text, 0, 0, 0b11111111, 0, 0, nullptr, 0);
         refreshed = true;
     }
 

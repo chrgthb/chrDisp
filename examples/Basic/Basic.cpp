@@ -65,21 +65,23 @@ void setup() {
     // so the local variables below can safely go out of scope.
     chrDisp::ConstDisplayItem item;
 
-    // 0. Simple text in the top-left corner (copied, truncated to the max text length)
+    // 0. Right-aligned text within an 80-pixel area and vertically centered in a 16-pixel-high frame
     item.text = "chrDisp OK";
-    item.size = 1;
     item.x = 0;
     item.y = 0;
+    item.width = -80;
+    item.height = 16;
+    item.frame = 1;
     item.type = chrDisp::ITEM_TEXT;
     myDisp.setDisplayItem(0, item);
 
-    // From here on the items are icons: no text, size = height in pixels
+    // From here on the items are icons: width and height are their pixel dimensions
     item = chrDisp::ConstDisplayItem();
 
     // 1. Battery icon in the top-right corner (75% charged)
     item.type = chrDisp::ITEM_BATTERY;
-    item.size = 10;
     item.width = 20;
+    item.height = 10;
     item.x = 105;
     item.y = 0;
     item.data = 75;
@@ -87,19 +89,19 @@ void setup() {
 
     // 2. WiFi icon, blinking (0b10101010 pattern) with 50% signal strength
     item.type = chrDisp::ITEM_WIFI;
-    item.size = 16;
     item.width = 16;
+    item.height = 16;
     item.x = 0;
     item.y = 20;
     item.blink = 0b10101010;
     item.data = 50;
     myDisp.setDisplayItem(2, item);
 
-    // 3. Potmeter icon (circle), size = 0-degree starting point, value 128 (half)
+    // 3. Potmeter icon (circle), zero-point angle = 0 degrees, value 128 (half)
     item = chrDisp::ConstDisplayItem();
     item.type = chrDisp::ITEM_POTMETER;
-    item.size = 0;
     item.width = 24;
+    item.zeroPointDeg = 0;
     item.x = 30;
     item.y = 20;
     item.data = 128;
@@ -108,8 +110,8 @@ void setup() {
     // 4. Disk icon with 90% fill level
     item = chrDisp::ConstDisplayItem();
     item.type = chrDisp::ITEM_DISK;
-    item.size = 16;
     item.width = 16;
+    item.height = 16;
     item.x = 70;
     item.y = 20;
     item.data = 90;
