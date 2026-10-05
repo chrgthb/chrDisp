@@ -63,11 +63,10 @@ void setup() {
 
     // Define display items. chrDisp copies them into its own storage,
     // so the local variables below can safely go out of scope.
-    chrDisp::DisplayItem item;
+    chrDisp::ConstDisplayItem item;
 
     // 0. Simple text in the top-left corner (copied, truncated to the max text length)
-    char label[] = "chrDisp OK";
-    item.text = label;
+    item.text = "chrDisp OK";
     item.size = 1;
     item.x = 0;
     item.y = 0;
@@ -75,7 +74,7 @@ void setup() {
     myDisp.setDisplayItem(0, item);
 
     // From here on the items are icons: no text, size = height in pixels
-    item = chrDisp::DisplayItem();
+    item = chrDisp::ConstDisplayItem();
 
     // 1. Battery icon in the top-right corner (75% charged)
     item.type = chrDisp::ITEM_BATTERY;
@@ -97,7 +96,7 @@ void setup() {
     myDisp.setDisplayItem(2, item);
 
     // 3. Potmeter icon (circle), size = 0-degree starting point, value 128 (half)
-    item = chrDisp::DisplayItem();
+    item = chrDisp::ConstDisplayItem();
     item.type = chrDisp::ITEM_POTMETER;
     item.size = 0;
     item.width = 24;
@@ -107,7 +106,7 @@ void setup() {
     myDisp.setDisplayItem(3, item);
 
     // 4. Disk icon with 90% fill level
-    item = chrDisp::DisplayItem();
+    item = chrDisp::ConstDisplayItem();
     item.type = chrDisp::ITEM_DISK;
     item.size = 16;
     item.width = 16;

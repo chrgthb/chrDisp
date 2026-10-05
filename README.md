@@ -62,9 +62,8 @@ void setup() {
 	myDisp.setEventCallback(onDispEvent);
 	myDisp.setHwUpdateCallback(hwUpdate);
 
-	chrDisp::DisplayItem item;
-	char text[] = "Hello World!";
-	item.text = text; // copied into the library's own buffer
+	chrDisp::ConstDisplayItem item;
+	item.text = "Hello World!"; // copied into the library's own buffer
 	myDisp.setDisplayItem(0, item);
 
 	myDisp.on();
@@ -82,7 +81,7 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 
 - `chrDisp(Adafruit_GFX* gfx, uint32_t turnOffMs = 10000, uint8_t maxDisplayItems = 0, uint8_t maxTextLen = 0, uint8_t maxSkipCharsLen = 0, uint16_t fgColor = 0xFFFF, uint16_t bgColor = 0x0000, uint8_t id = 0)`
 	- Constructor initializing display pointer, sleep timeout, the maximum number of display items, the maximum text / skipChars length per item (buffers are allocated once here), foreground/background colors, and display instance ID. The object is not copyable.
-- `bool setDisplayItem(uint8_t index, const DisplayItem& item)`
+- `bool setDisplayItem(uint8_t index, const ConstDisplayItem& item)`
 	- Copies the item (including text and skipChars, truncated to the configured maximums) into slot `index` and marks it for redraw. Returns `false` if `index` is out of range.
 - `DisplayItem* editDisplayItem(uint8_t index)`
 	- Low-cost in-place modification: returns a pointer to the stored item (no copy) and marks it for redraw. Returns `nullptr` if `index` is out of range. Cleared items stay cleared; use `setDisplayItem()` to show them again. `text` and `skipChars` point to fixed buffers (`maxTextLen + 1` / `maxSkipCharsLen + 1` bytes): write them with `strlcpy()` and never reassign the pointers.
@@ -144,11 +143,10 @@ Supported `ItemTypes`:
 - `ITEM_AP = 7`
 - `ITEM_POTMETER = 8`
 
-Items are set with `setDisplayItem()` using the `DisplayItem` struct (the `text` and `skipChars` pointers are only read during the call):
+Items are set with `setDisplayItem()` using the `ConstDisplayItem` struct (`text` and `skipChars` are `const char*`, so string literals work; they are only read during the call). The stored `DisplayItem` returned by `editDisplayItem()` has the same properties with writable `char*` text buffers.
 
 ```cpp
-struct DisplayItem {
-    char* text = nullptr;
+struct ItemProps {              // common part of ConstDisplayItem and DisplayItem
     uint8_t size = 2;
     uint16_t width = 0;
     int16_t x = 0;
@@ -157,10 +155,19 @@ struct DisplayItem {
     int16_t invert = 0;
     uint8_t blink = 0b11111111;
     int16_t blinkChar = 0;
-    char* skipChars = nullptr;
     uint8_t frame = 0;
     uint8_t data = 0;
     ItemStates state = ITEM_CLEARED; // managed by the library
+};
+
+struct ConstDisplayItem : ItemProps {   // input of setDisplayItem()
+    const char* text = nullptr;
+    const char* skipChars = nullptr;
+};
+
+struct DisplayItem : ItemProps {        // stored item, edited in place
+    char* text = nullptr;
+    char* skipChars = nullptr;
 };
 ```
 

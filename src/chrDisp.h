@@ -46,8 +46,7 @@ public:
 
     // Properties of displayable items
     // - clearDisplayItem set needRedraw to -1, so it will be cleared from the screen, set to 0 and won't be redisplayed
-    struct DisplayItem {
-        char* text = nullptr;       // Text to display (not relevant for icons)
+    struct ItemProps {
         uint8_t size = 2;           // Font size for text, height in pixels for icons
         uint16_t width = 0;         // For icons
                                     // - if set for text and text is smaller then given width, text will be centered within the width
@@ -61,7 +60,6 @@ public:
                                     // - negative numbers indicate inversion of every 2nd, 3rd, 4th character respectively
         uint8_t blink = 0b11111111; // In which quarter of the blinking the item should appear on the display (max 8 quarters)
         int16_t blinkChar = 0;      // For texts: blink characters with the same method like inversion works for texts (but 0 and -1 means the same, a fully blinking text)
-        char* skipChars = nullptr;  // Characters to ignore during blinking or inversion (you can set for eg. space or new line chars if they just separate text parts)
         uint8_t frame = 0;          // A button like rounded rect around the item
                                     // - numbers mean the thickness of the frame
                                     // - if color off the frame equals to background, it will be a rounded rectangle with foreground color
@@ -69,6 +67,18 @@ public:
                                     // - FRAMES WON'T BLINK automatically
         uint8_t data = 0;           // Percent or level for icons
         ItemStates state = ITEM_CLEARED; // Current state of the item (normal, needs redraw, to clear, cleared)
+    };
+
+    // Stored item: text buffers are owned by chrDisp and writable through editDisplayItem()
+    struct DisplayItem : ItemProps {
+        char* text = nullptr;       // Text to display (not relevant for icons)
+        char* skipChars = nullptr;  // Characters to ignore during blinking or inversion (you can set for eg. space or new line chars if they just separate text parts)
+    };
+
+    // Input item for setDisplayItem(): accepts string literals, the strings are copied
+    struct ConstDisplayItem : ItemProps {
+        const char* text = nullptr;
+        const char* skipChars = nullptr;
     };
 
     // Constructor: expects a GFX pointer
@@ -88,7 +98,7 @@ public:
     void setHwDimCallback(HardwareBoolAction cb) { _hwDimming = cb; }   // e.g., dim() command
     void setHwInvertCallback(HardwareBoolAction cb) { _hwInvert = cb; } // e.g., invertDisplay()
 
-    bool setDisplayItem(uint8_t index, const DisplayItem& item);
+    bool setDisplayItem(uint8_t index, const ConstDisplayItem& item);
     // Direct access for in-place modification (no copy); marks a visible item for redraw
     // - text/skipChars point to fixed buffers (maxTextLen/maxSkipCharsLen + 1), write them with strlcpy, don't reassign
     // - returns nullptr if the index is invalid; cleared items stay cleared (use setDisplayItem to show them again)

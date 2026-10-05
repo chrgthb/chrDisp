@@ -51,19 +51,11 @@ chrDisp::~chrDisp() {
     }
 }
 
-bool chrDisp::setDisplayItem(uint8_t index, const DisplayItem& item) {
+bool chrDisp::setDisplayItem(uint8_t index, const ConstDisplayItem& item) {
     if (index >= _maxDisplayItems || _items == nullptr) return false;
 
-    // Save pointers to avoid overwriting them during structure copy
-    char* destText = _items[index].text;
-    char* destSkip = _items[index].skipChars;
-
-    // Datacopy (the base data copy, this will temporarily overwrite the pointers with the incoming ones)
-    _items[index] = item; 
-
-    // Restore pointers to our allocated memory area
-    _items[index].text = destText;
-    _items[index].skipChars = destSkip;
+    // Copy only the properties; the owned text buffers stay untouched
+    static_cast<ItemProps&>(_items[index]) = item;
 
     // Safe copy of text strings (deep copy)
     if (_items[index].text != nullptr && item.text != nullptr) {
@@ -624,11 +616,13 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
         textWidth = width;  // Increase the frame or fillRect width to match the specified width
     }
 
+    bool fullInvert = invert == -1;
+
     if (frame != 0) {
-        _drawFrameHelper(textX, textY, textWidth, textHeight, invert, frame);
+        _drawFrameHelper(textX, textY, textWidth, textHeight, fullInvert, frame);
     } else {
         // Clear the text area (square area with frame if set)
-        _gfx->fillRect(textX, textY, textWidth, textHeight, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(textX, textY, textWidth, textHeight, fullInvert ? _fgColor : _bgColor);
     }
 
     bool fullBlink = blinkChar == 0 || blinkChar == -1;
@@ -638,10 +632,6 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
         return;
     }
 
-    bool fullInvert = invert == -1;
-    uint16_t color = fullInvert ? _bgColor : _fgColor;
-    uint16_t background = fullInvert ? _fgColor : _bgColor;
-    
     _gfx->setCursor(x, y);
     _gfx->setTextWrap(false);
     
@@ -670,7 +660,7 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
             invertChar = charCounter % (-invert) == 0;
         }
 
-        _gfx->setTextColor(invertChar ? background : color, invertChar ? color : background);
+        _gfx->setTextColor(invertChar ? _bgColor : _fgColor, invertChar ? _fgColor : _bgColor);
         _gfx->print(text[i]);
     }
 }
