@@ -211,8 +211,11 @@ void chrDisp::_drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t he
     int16_t frameHeight = height + 2 * frame;
 
     _gfx->fillRoundRect(frameX, frameY, frameWidth, frameHeight, ROUNDED_RECT_RADIUS, background);
-    if (color == _bgColor) {
-        // Draw a foreground colored frame around if the color is the background color
+    if (invert) {
+        // Draw a _bgColor colored (=color) frame 1 pixel inner if inverted
+        _gfx->drawRoundRect(frameX + 1, frameY + 1, frameWidth - 2, frameHeight - 2, ROUNDED_RECT_RADIUS - 1, color);
+    } else {
+        // Draw a _fgColor colored (=color) frame around if not inverted (normal case)
         _gfx->drawRoundRect(frameX, frameY, frameWidth, frameHeight, ROUNDED_RECT_RADIUS, color);
     }
 }
@@ -756,6 +759,7 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
         refreshed = true;
 
         // If the item was set to be cleared, mark it as cleared after drawing
+        // and if it was marked to redraw, it will be set back to normal after drawing
         _items[i].state = _items[i].state == ITEM_TO_CLEAR ? ITEM_CLEARED : ITEM_NORMAL;
     }
 
