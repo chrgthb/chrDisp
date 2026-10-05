@@ -1,6 +1,6 @@
 {
   "name": "chrDisp",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Display management library for Arduino framework depends on Adafruit GFX",
   "keywords": "display, adafruit gfx, esp32, esp8266, arduino",
   "repository": {
