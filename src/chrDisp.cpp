@@ -608,35 +608,35 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
     int16_t textX, textY;
     uint16_t textWidth, textHeight;
     _gfx->setTextSize(size);
-    _gfx->getTextBounds(text, x, y, &textX, &textY, &textWidth, &textHeight);
+    _gfx->getTextBounds(text, 0, 0, &textX, &textY, &textWidth, &textHeight);   // Offsets of the glyph box from the cursor (non-zero for custom fonts)
+    int16_t cursorX = x - textX;
+    int16_t cursorY = y - textY;
 
     bool rightAlign = width < 0;
-    uint16_t areaWidth = width < 0
-        ? static_cast<uint16_t>(-static_cast<int32_t>(width))
-        : static_cast<uint16_t>(width);
-    if (areaWidth != 0 && textWidth < areaWidth) {
+    width = abs(width);
+    if (textWidth < width) {
         if (!rightAlign) {
             // Center the text within the given width if it's smaller than the width
-            x += (areaWidth - textWidth) / 2;
+            cursorX += (width - textWidth) / 2;
         } else {
             // Right-align the text within the given width if it's smaller than the width
-            x += areaWidth - textWidth;
+            cursorX += width - textWidth;
         }
-        textWidth = areaWidth;  // Increase the frame or fillRect width to match the specified width
+        textWidth = width;  // Increase the frame or fillRect width to match the specified width
     }
 
     if (textHeight < height) {
-        y += (height - textHeight) / 2;
+        cursorY += (height - textHeight) / 2;
         textHeight = height;  // Increase the text height to match the specified height
     }
 
     bool fullInvert = invert == -1;
 
     if (frame != 0) {
-        _drawFrameHelper(textX, textY, textWidth, textHeight, fullInvert, frame);
+        _drawFrameHelper(x, y, textWidth, textHeight, fullInvert, frame);
     } else {
         // Clear the text area (square area with frame if set)
-        _gfx->fillRect(textX, textY, textWidth, textHeight, fullInvert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, textWidth, textHeight, fullInvert ? _fgColor : _bgColor);
     }
 
     bool fullBlink = blinkChar == 0 || blinkChar == -1;
@@ -646,7 +646,7 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
         return;
     }
 
-    _gfx->setCursor(x, y);
+    _gfx->setCursor(cursorX, cursorY);
     _gfx->setTextWrap(false);
     
     uint8_t charCounter = 0;    // For invert and blink count chars which are not skipped
