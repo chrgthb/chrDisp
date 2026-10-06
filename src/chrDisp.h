@@ -106,6 +106,8 @@ public:
     // - returns nullptr if the index is invalid; cleared items stay cleared (use setDisplayItem to show them again)
     DisplayItem* editDisplayItem(uint8_t index);
     bool clearDisplayItem(uint8_t index);
+    // Read-only access to query properties; does not change the item state (nullptr if the index is invalid)
+    const DisplayItem* getDisplayItem(uint8_t index) const;
     void setColors(uint16_t fg, uint16_t bg);
     void off();
     void on();

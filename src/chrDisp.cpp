@@ -87,6 +87,11 @@ bool chrDisp::clearDisplayItem(uint8_t index) {
     return true;
 }
 
+const chrDisp::DisplayItem* chrDisp::getDisplayItem(uint8_t index) const {
+    if (index >= _maxDisplayItems || _items == nullptr) return nullptr;
+    return &_items[index];
+}
+
 void chrDisp::setColors(uint16_t fg, uint16_t bg) {
     _fgColor = fg;
     _bgColor = bg;

@@ -87,6 +87,8 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 	- Low-cost in-place modification: returns a pointer to the stored item (no copy) and marks it for redraw. Returns `nullptr` if `index` is out of range. Cleared items stay cleared; use `setDisplayItem()` to show them again. `text` and `skipChars` point to fixed buffers (`maxTextLen + 1` / `maxSkipCharsLen + 1` bytes): write them with `strlcpy()` and never reassign the pointers.
 - `bool clearDisplayItem(uint8_t index)`
 	- Marks the item to be erased from the screen on the next `loop()`. Returns `false` if `index` is out of range.
+- `const DisplayItem* getDisplayItem(uint8_t index) const`
+	- Read-only access to the stored item for querying properties (e.g. `getDisplayItem(0)->state`). Does not change the item state or trigger a redraw. Returns `nullptr` if `index` is out of range.
 - `void setHwUpdateCallback(HardwareAction cb)`
 	- Registers callback for updating/flushing the display hardware (e.g., `display.display()`).
 - `void setHwClearCallback(HardwareAction cb)`
@@ -192,6 +194,14 @@ Existing items can be changed cheaply with `editDisplayItem()`:
 if (chrDisp::DisplayItem* it = myDisp.editDisplayItem(0)) {
     strlcpy(it->text, "Updated", 13); // 12 = maxTextLen in the Quick Start
     it->blink = 0b11110000;
+}
+```
+
+Properties can be queried without touching the item state with `getDisplayItem()`:
+
+```cpp
+if (const chrDisp::DisplayItem* it = myDisp.getDisplayItem(0)) {
+    bool cleared = (it->state == chrDisp::ITEM_CLEARED);
 }
 ```
 
