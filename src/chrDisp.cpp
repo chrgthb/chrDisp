@@ -164,6 +164,10 @@ void chrDisp::setBlinkCallback(BlinkCallback cb) {
     _onBlink = cb;
 }
 
+void chrDisp::removeBlinkCallback() {
+    _onBlink = nullptr;
+}
+
 void chrDisp::setTurnOff(uint32_t turnOffMs) {
     if (turnOffMs > 0 && turnOffMs < MIN_TURN_OFF_MS) {
         turnOffMs = MIN_TURN_OFF_MS;
@@ -692,6 +696,17 @@ bool chrDisp::loop(bool turnOnResetSleep, const char* text, uint8_t size, bool i
     return _loopImpl(turnOnResetSleep, invertDisplay, clearDisplay, text, size);
 }
 
+// Blinking timing (calculate only if BLINK_INTERVAL_MS passed)
+void chrDisp::_stepBlinkQuarter(uint32_t now) {
+    uint32_t elapsedSincePrevQuarter = now - _blinkQuarterChangedMillis;
+
+    if (elapsedSincePrevQuarter > BLINK_INTERVAL_MS) {
+        uint32_t elapsedQuarters = elapsedSincePrevQuarter / BLINK_INTERVAL_MS;
+        _blinkQuarter = (_blinkQuarter + elapsedQuarters) % 8;
+        _blinkQuarterChangedMillis += elapsedQuarters * BLINK_INTERVAL_MS;
+    }
+}
+
 bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDisplay, const char* text, uint8_t textSize) {
     // Safety check
     if (_gfx == nullptr) {
@@ -713,6 +728,12 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
         off();
     }
 
+    // Blinking timing on need or _isOn
+    uint8_t oldBlinkQuarter = _blinkQuarter;
+    if (_onBlink || _isOn) _stepBlinkQuarter(now);
+    // Fire the blink callback only when the quarter changed
+    if (_onBlink && oldBlinkQuarter != _blinkQuarter) _onBlink(_id, _blinkQuarter);
+
     // At this point, if the display is not on, there is nothing to do
     if (!_isOn) return false;
 
@@ -722,18 +743,6 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
         dim(true);
     } else {
         dim(false);
-    }
-
-    // Blinking timing (calculate only if BLINK_INTERVAL_MS passed)
-    uint8_t oldBlinkQuarter = _blinkQuarter;
-    uint32_t elapsedSincePrevQuarter = now - _blinkQuarterChangedMillis;
-    if (elapsedSincePrevQuarter > BLINK_INTERVAL_MS) {
-        uint32_t elapsedQuarters = elapsedSincePrevQuarter / BLINK_INTERVAL_MS;
-        _blinkQuarter = (_blinkQuarter + elapsedQuarters) % 8;
-        _blinkQuarterChangedMillis += elapsedQuarters * BLINK_INTERVAL_MS;
-
-        // Fire the blink callback if it is set
-        if (_onBlink) _onBlink(_id, _blinkQuarter);
     }
 
     // Drawing on need

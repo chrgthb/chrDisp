@@ -118,7 +118,9 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 - `const char* eventName(EventCode code)`
 	- Returns a readable event name from the event code, without formatting or allocating a message.
 - `void setBlinkCallback(BlinkCallback cb)`
-	- Registers blink callback.
+	- Registers blink callback, called on every blink quarter change (250 ms), even while the display is off (e.g., to blink a LED).
+- `void removeBlinkCallback()`
+	- Unregisters the blink callback. Without a callback, blink timing is not stepped while the display is off, so `loop()` returns earlier.
 - `void setTurnOff(uint32_t turnOffMs)`
 	- Sets auto turn-off timeout in milliseconds.
 - `bool isOn()`
