@@ -24,7 +24,8 @@ public:
 
     // Types of displayable items
     enum ItemTypes {
-        ITEM_TEXT = -1,
+        ITEM_TEXT_WRAP = -2,
+        ITEM_TEXT,
         ITEM_VBAR,
         ITEM_HBAR,
         ITEM_BATTERY,
@@ -206,7 +207,7 @@ private:
     void _drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t frame = 0);
     void _drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0, bool batteryTip = false);
     void _drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0);
-    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width = 0, uint16_t height = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0);
+    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width = 0, uint16_t height = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0, bool wrap = false);
     void _stepBlinkQuarter(uint32_t now);
     bool _loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDisplay, const char* text, uint8_t textSize);
     // Internal event handler

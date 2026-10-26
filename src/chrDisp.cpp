@@ -609,7 +609,7 @@ void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPo
     _gfx->drawLine(centerX, centerY, endX, endY, color);
 }
 
-void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width, uint16_t height, uint8_t blink, int16_t blinkChar, int16_t invert, const char* skipChars, uint8_t frame) {
+void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width, uint16_t height, uint8_t blink, int16_t blinkChar, int16_t invert, const char* skipChars, uint8_t frame, bool wrap) {
     if (text == nullptr || text[0] == '\0') return;    // Do not draw if the text is null
 
     if (_gfx == nullptr) return;
@@ -656,7 +656,7 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
     }
 
     _gfx->setCursor(cursorX, cursorY);
-    _gfx->setTextWrap(false);
+    _gfx->setTextWrap(wrap);
     
     uint8_t charCounter = 0;    // For invert and blink count chars which are not skipped
     for (uint16_t i = 0; text[i] != '\0'; ++i) {
@@ -768,9 +768,9 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
         int16_t invert = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].invert;
 
         // Redraw the item based on its type
-        if (_items[i].type == ITEM_TEXT) {
+        if (_items[i].type == ITEM_TEXT || _items[i].type == ITEM_TEXT_WRAP) {
             int16_t blinkChar = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].blinkChar;
-            _drawTextHelper(_items[i].x, _items[i].y, _items[i].size, _items[i].text, _items[i].width, _items[i].height, blinkByte, blinkChar, invert, _items[i].skipChars, _items[i].frame);
+            _drawTextHelper(_items[i].x, _items[i].y, _items[i].size, _items[i].text, _items[i].width, _items[i].height, blinkByte, blinkChar, invert, _items[i].skipChars, _items[i].frame, _items[i].type == ITEM_TEXT_WRAP);
         } else {
             if (_items[i].width > 0) { // Safety, texts can have width <= 0
                 uint16_t secondDimension = _items[i].type == ITEM_POTMETER ? _items[i].zeroPointDeg : _items[i].height;
