@@ -199,12 +199,16 @@ void chrDisp::_fireEvent(EventCode code) {
     _onEvent(code, _id);
 }
 
-void chrDisp::_drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert, uint8_t frame) {
+void chrDisp::_resolveColors(int32_t fgColor, int32_t bgColor, bool invert, uint16_t& color, uint16_t& background) const {
+    uint16_t fg = (fgColor == COLOR_DEFAULT) ? _fgColor : static_cast<uint16_t>(fgColor);
+    uint16_t bg = (bgColor == COLOR_DEFAULT) ? _bgColor : static_cast<uint16_t>(bgColor);
+    color = invert ? bg : fg;
+    background = invert ? fg : bg;
+}
+
+void chrDisp::_drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, uint16_t color, uint16_t background, bool invert, uint8_t frame) {
     if (_gfx == nullptr) return;
     if (frame == 0) return;
-
-    uint16_t color = invert ? _bgColor : _fgColor;
-    uint16_t background = invert ? _fgColor : _bgColor;
 
     int16_t frameX = x - frame;
     int16_t frameY = y - frame;
@@ -213,19 +217,18 @@ void chrDisp::_drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t he
 
     _gfx->fillRoundRect(frameX, frameY, frameWidth, frameHeight, ROUNDED_RECT_RADIUS, background);
     if (invert) {
-        // Draw a _bgColor colored (=color) frame 1 pixel inner if inverted
+        // Draw the frame 1 pixel inner if inverted
         _gfx->drawRoundRect(frameX + 1, frameY + 1, frameWidth - 2, frameHeight - 2, ROUNDED_RECT_RADIUS - 1, color);
     } else {
-        // Draw a _fgColor colored (=color) frame around if not inverted (normal case)
+        // Draw the frame around if not inverted (normal case)
         _gfx->drawRoundRect(frameX, frameY, frameWidth, frameHeight, ROUNDED_RECT_RADIUS, color);
     }
 }
 
-void chrDisp::_drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert, uint8_t percent, int16_t outlineRadius, bool batteryTip) {
+void chrDisp::_drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, uint16_t color, uint8_t percent, int16_t outlineRadius, bool batteryTip) {
     if (_gfx == nullptr) return;
 
     if (percent > 100) percent = 100;
-    uint16_t color = invert ? _bgColor : _fgColor;
 
     // Battery tip size
     uint16_t tipHeight = 0;
@@ -265,11 +268,10 @@ void chrDisp::_drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint1
     );
 }
 
-void chrDisp::_drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert, uint8_t percent, int16_t outlineRadius) {
+void chrDisp::_drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, uint16_t color, uint8_t percent, int16_t outlineRadius) {
     if (_gfx == nullptr) return;
 
     if (percent > 100) percent = 100;
-    uint16_t color = invert ? _bgColor : _fgColor;
 
     // Frame
     if (outlineRadius > 0) {
@@ -293,65 +295,76 @@ void chrDisp::_drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint1
     );
 }
 
-void chrDisp::drawVBar(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
+void chrDisp::drawVBar(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent, int32_t fgColor, int32_t bgColor) {
     if (_gfx == nullptr) return;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
-    _drawVFilledRectHelper(x, y, width, height, invert, percent, ROUNDED_RECT_RADIUS);
+    _drawVFilledRectHelper(x, y, width, height, color, percent, ROUNDED_RECT_RADIUS);
 }
 
-void chrDisp::drawHBar(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
+void chrDisp::drawHBar(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent, int32_t fgColor, int32_t bgColor) {
     if (_gfx == nullptr) return;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
-    _drawHFilledRectHelper(x, y, width, height, invert, percent, ROUNDED_RECT_RADIUS);
+    _drawHFilledRectHelper(x, y, width, height, color, percent, ROUNDED_RECT_RADIUS);
 }
 
-void chrDisp::drawBattery(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
+void chrDisp::drawBattery(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent, int32_t fgColor, int32_t bgColor) {
     if (_gfx == nullptr) return;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
-    _drawVFilledRectHelper(x, y, width, height, invert, percent, ROUNDED_RECT_RADIUS, true);
+    _drawVFilledRectHelper(x, y, width, height, color, percent, ROUNDED_RECT_RADIUS, true);
 }
 
-void chrDisp::drawCharge(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed) {
+void chrDisp::drawCharge(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed, int32_t fgColor, int32_t bgColor) {
     (void)notUsed;
     if (_gfx == nullptr) return;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
-    uint16_t color = invert ? _bgColor : _fgColor;
 
     // 1. Determine the midpoints (using integer division to handle parity)
     // If width = 9 (odd), both will be 4 -> overlap
@@ -391,20 +404,22 @@ void chrDisp::drawCharge(int16_t x, int16_t y, uint16_t width, uint16_t height, 
     );
 }
 
-void chrDisp::drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed) {
+void chrDisp::drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed, int32_t fgColor, int32_t bgColor) {
     (void)notUsed;
     if (_gfx == nullptr) return;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
-    uint16_t color = invert ? _bgColor : _fgColor;
     uint16_t centerX = x + (width / 2);
     uint16_t centerY = y + (height / 2);
     
@@ -420,20 +435,22 @@ void chrDisp::drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t heigh
     _gfx->fillCircle(centerX, centerY, radius, color);
 }
 
-void chrDisp::drawDisk(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
+void chrDisp::drawDisk(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent, int32_t fgColor, int32_t bgColor) {
     if (_gfx == nullptr) return;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
     // Color constant
-    uint16_t color = invert ? _bgColor : _fgColor;
 
     // Scaling the top-right notch
     uint16_t notchSize = min(width, height) / 4;
@@ -464,23 +481,25 @@ void chrDisp::drawDisk(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
     // Safety check to ensure there is actually space to draw (on smaller displays)
     if (bottomY > barTopY + 2) {
         uint16_t barHeight = bottomY - barTopY - 1;
-        drawVBar(x + 2, barTopY, width - 4, barHeight, blink, invert, 0, percent);
+        drawVBar(x + 2, barTopY, width - 4, barHeight, blink, invert, 0, percent, fgColor, bgColor);
     }
 }
 
-void chrDisp::drawWiFi(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent) {
+void chrDisp::drawWiFi(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t percent, int32_t fgColor, int32_t bgColor) {
     if (_gfx == nullptr) return;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // Do not draw during this phase of blinking
 
-    uint16_t color = invert ? _bgColor : _fgColor;
     uint16_t bottomY = y + height - 1;
     
     if (percent > 100) percent = 100; // Safety limit
@@ -530,20 +549,22 @@ void chrDisp::drawWiFi(int16_t x, int16_t y, uint16_t width, uint16_t height, ui
     }
 }
 
-void chrDisp::drawAP(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed) {
+void chrDisp::drawAP(int16_t x, int16_t y, uint16_t width, uint16_t height, uint8_t blink, bool invert, uint8_t frame, uint8_t notUsed, int32_t fgColor, int32_t bgColor) {
     (void)notUsed;
     if (_gfx == nullptr) return;
+
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
     
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (if the entire display is not being refreshed)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return;  // No need to draw during this phase of blinking
 
-    uint16_t color = invert ? _bgColor : _fgColor;
     uint16_t bottomY = y + height - 1;
     
     uint16_t centerX = x + (width / 2);
@@ -558,22 +579,24 @@ void chrDisp::drawAP(int16_t x, int16_t y, uint16_t width, uint16_t height, uint
     _gfx->drawCircleHelper(centerX, centerY, maxRadius, 1 | 2, color);
 }
 
-void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPointDeg, uint8_t blink, bool invert, uint8_t frame, uint8_t level) {
+void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPointDeg, uint8_t blink, bool invert, uint8_t frame, uint8_t level, int32_t fgColor, int32_t bgColor) {
     if (_gfx == nullptr) return;
+
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, invert, color, background);
 
     // Since the base is circular, the height of the area is the same as the width
     uint16_t height = width;
 
     if (frame != 0) {
-        _drawFrameHelper(x, y, width, height, invert, frame);
+        _drawFrameHelper(x, y, width, height, color, background, invert, frame);
     } else {
         // Clear the icon area (square area)
-        _gfx->fillRect(x, y, width, height, invert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, width, height, background);
     }
 
     if (!checkBlinkBit(blink, _blinkQuarter)) return; // No need to draw during this phase of blinking
 
-    uint16_t color = invert ? _bgColor : _fgColor;
 
     // Center of the circle
     int16_t centerX = x + (width / 2);
@@ -609,7 +632,7 @@ void chrDisp::drawPotmeter(int16_t x, int16_t y, uint16_t width, uint16_t zeroPo
     _gfx->drawLine(centerX, centerY, endX, endY, color);
 }
 
-void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width, uint16_t height, uint8_t blink, int16_t blinkChar, int16_t invert, const char* skipChars, uint8_t frame, bool wrap) {
+void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width, uint16_t height, uint8_t blink, int16_t blinkChar, int16_t invert, const char* skipChars, uint8_t frame, bool wrap, int32_t fgColor, int32_t bgColor, bool erase) {
     if (text == nullptr || text[0] == '\0') return;    // Do not draw if the text is null
 
     if (_gfx == nullptr) return;
@@ -641,11 +664,20 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
 
     bool fullInvert = invert == -1;
 
+    uint16_t color, background;
+    _resolveColors(fgColor, bgColor, fullInvert, color, background);
+
+    if (erase) {
+        // Erase the text area together with its frame (the frame is drawn outside of the area)
+        _gfx->fillRect(x - frame, y - frame, textWidth + 2 * frame, textHeight + 2 * frame, background);
+        return;
+    }
+
     if (frame != 0) {
-        _drawFrameHelper(x, y, textWidth, textHeight, fullInvert, frame);
+        _drawFrameHelper(x, y, textWidth, textHeight, color, background, fullInvert, frame);
     } else {
         // Clear the text area (square area with frame if set)
-        _gfx->fillRect(x, y, textWidth, textHeight, fullInvert ? _fgColor : _bgColor);
+        _gfx->fillRect(x, y, textWidth, textHeight, background);
     }
 
     bool fullBlink = blinkChar == 0 || blinkChar == -1;
@@ -683,7 +715,8 @@ void chrDisp::_drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* te
             invertChar = charCounter % (-invert) == 0;
         }
 
-        _gfx->setTextColor(invertChar ? _bgColor : _fgColor, invertChar ? _fgColor : _bgColor);
+        _resolveColors(fgColor, bgColor, invertChar, color, background);
+        _gfx->setTextColor(color, background);
         _gfx->print(text[i]);
     }
 }
@@ -766,15 +799,25 @@ bool chrDisp::_loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDis
         // If have to clear, set blinkByte and invert accordingly
         uint8_t blinkByte = _items[i].state == ITEM_TO_CLEAR ? 0b00000000 : _items[i].blink;
         int16_t invert = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].invert;
+        // Clearing always erases with the display's own background, whatever colors the item had
+        int32_t fgColor = _items[i].state == ITEM_TO_CLEAR ? COLOR_DEFAULT : _items[i].fgColor;
+        int32_t bgColor = _items[i].state == ITEM_TO_CLEAR ? COLOR_DEFAULT : _items[i].bgColor;
 
         // Redraw the item based on its type
         if (_items[i].type == ITEM_TEXT || _items[i].type == ITEM_TEXT_WRAP) {
             int16_t blinkChar = _items[i].state == ITEM_TO_CLEAR ? 0 : _items[i].blinkChar;
-            _drawTextHelper(_items[i].x, _items[i].y, _items[i].size, _items[i].text, _items[i].width, _items[i].height, blinkByte, blinkChar, invert, _items[i].skipChars, _items[i].frame, _items[i].type == ITEM_TEXT_WRAP);
+            _drawTextHelper(_items[i].x, _items[i].y, _items[i].size, _items[i].text, _items[i].width, _items[i].height, blinkByte, blinkChar, invert, _items[i].skipChars, _items[i].frame, _items[i].type == ITEM_TEXT_WRAP, fgColor, bgColor, _items[i].state == ITEM_TO_CLEAR);
         } else {
             if (_items[i].width > 0) { // Safety, texts can have width <= 0
                 uint16_t secondDimension = _items[i].type == ITEM_POTMETER ? _items[i].zeroPointDeg : _items[i].height;
-                drawItem(_items[i].type, _items[i].x, _items[i].y, _items[i].width, secondDimension, blinkByte, invert != 0, _items[i].frame, _items[i].data);
+                if (_items[i].state == ITEM_TO_CLEAR && _items[i].frame != 0) {
+                    // Erase the icon together with its frame: draw the enlarged area without frame (blinkByte is 0, so only the background fill is drawn)
+                    int16_t f = _items[i].frame;
+                    if (_items[i].type != ITEM_POTMETER) secondDimension += 2 * f;
+                    drawItem(_items[i].type, _items[i].x - f, _items[i].y - f, _items[i].width + 2 * f, secondDimension, blinkByte, false, 0, _items[i].data, fgColor, bgColor);
+                } else {
+                    drawItem(_items[i].type, _items[i].x, _items[i].y, _items[i].width, secondDimension, blinkByte, invert != 0, _items[i].frame, _items[i].data, fgColor, bgColor);
+                }
             }
         }
         refreshed = true;

@@ -38,6 +38,11 @@ public:
         ITEM_COUNT
     };
 
+    // Item color value meaning "use the display's default color" (see constructor / setColors)
+    // - any other value is passed to the GFX driver as is: RGB565 for color displays,
+    //   0..15 gray level for 4-bit grayscale OLEDs (e.g. SSD1327), 0/1 for monochrome ones
+    enum : int32_t { COLOR_DEFAULT = -1 };
+
     enum ItemStates {
         ITEM_TO_CLEAR = -2,         // (set by clearDisplayItem) Item needs to be cleared from the screen
         ITEM_CLEARED = -1,          // (set by clearDisplayItem) Item has been cleared from the screen
@@ -69,6 +74,9 @@ public:
                                     // - else it will be a filled rounded rectangle
                                     // - FRAMES WON'T BLINK automatically
         uint8_t data = 0;           // Percent or level for icons
+        int32_t fgColor = COLOR_DEFAULT; // Foreground color of the item (COLOR_DEFAULT: the display's fgColor)
+        int32_t bgColor = COLOR_DEFAULT; // Background color of the item (COLOR_DEFAULT: the display's bgColor)
+                                    // - invert swaps these two, so inversion works with any color depth
         ItemStates state = ITEM_CLEARED; // Current state of the item (normal, needs redraw, to clear, cleared)
     };
 
@@ -133,18 +141,18 @@ public:
     bool isInverted();
     uint32_t getTurnOffMs();
     
-    void drawVBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawHBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawBattery  (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawCharge   (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
-    void drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
-    void drawDisk     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawWiFi     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0);
-    void drawAP       (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0);
-    void drawPotmeter (int16_t x, int16_t y, uint16_t width, uint16_t zeroPointDeg, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t level = 0);
+    void drawVBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawHBar     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawBattery  (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawCharge   (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawCrosshair(int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawDisk     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawWiFi     (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t percent = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawAP       (int16_t x, int16_t y, uint16_t width, uint16_t height,       uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t notUsed = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
+    void drawPotmeter (int16_t x, int16_t y, uint16_t width, uint16_t zeroPointDeg, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t level = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT);
 
     // Defining the pointer
-    using DrawFuncPtr = void (chrDisp::*)(int16_t, int16_t, uint16_t, uint16_t, uint8_t, bool, uint8_t, uint8_t);
+    using DrawFuncPtr = void (chrDisp::*)(int16_t, int16_t, uint16_t, uint16_t, uint8_t, bool, uint8_t, uint8_t, int32_t, int32_t);
 
     // Creating an array of pointers (must match the enum)
     static constexpr DrawFuncPtr DRAW_FUNCTIONS[9] = {
@@ -160,10 +168,10 @@ public:
     };
 
     // Creating the calling function
-    void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t val = 0) {
+    void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t val = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT) {
         if (type >= 0 && type < ITEM_COUNT) {
             // Calling the pointer on the current (this) object
-            (this->*DRAW_FUNCTIONS[type])(x, y, w, h, blink, invert, frame, val);
+            (this->*DRAW_FUNCTIONS[type])(x, y, w, h, blink, invert, frame, val, fgColor, bgColor);
         }
     }
 
@@ -204,10 +212,12 @@ private:
     static constexpr uint16_t MIN_TURN_OFF_MS = DIM_TIME_MS * 2;
     static constexpr uint8_t ROUNDED_RECT_RADIUS = 3;   // 3 pixel won't be a problem on filled icons
 
-    void _drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t frame = 0);
-    void _drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0, bool batteryTip = false);
-    void _drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, bool invert = false, uint8_t percent = 0, int16_t outlineRadius = 0);
-    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width = 0, uint16_t height = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0, bool wrap = false);
+    // Resolves the item colors (COLOR_DEFAULT -> display colors); with invert the two are swapped
+    void _resolveColors(int32_t fgColor, int32_t bgColor, bool invert, uint16_t& color, uint16_t& background) const;
+    void _drawFrameHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, uint16_t color, uint16_t background, bool invert = false, uint8_t frame = 0);
+    void _drawVFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, uint16_t color, uint8_t percent = 0, int16_t outlineRadius = 0, bool batteryTip = false);
+    void _drawHFilledRectHelper(int16_t x, int16_t y, uint16_t width, uint16_t height, uint16_t color, uint8_t percent = 0, int16_t outlineRadius = 0);
+    void _drawTextHelper(int16_t x, int16_t y, uint8_t size, const char* text, int16_t width = 0, uint16_t height = 0, uint8_t blink = 0b11111111, int16_t blinkChar = 0, int16_t invert = 0, const char* skipChars = nullptr, uint8_t frame = 0, bool wrap = false, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT, bool erase = false);
     void _stepBlinkQuarter(uint32_t now);
     bool _loopImpl(bool turnOnResetSleep, bool invertDisplay, bool clearDisplay, const char* text, uint8_t textSize);
     // Internal event handler

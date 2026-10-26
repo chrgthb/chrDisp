@@ -10,7 +10,7 @@ It is designed for projects that need:
 - Non-blocking loop processing with automatic 4-phase blinking bitmasks and text inversion effects
 - Event-driven display status reporting
 
-The library targets the Arduino framework and works with any display driver compatible with `Adafruit_GFX` (e.g., SSD1306, ST7789, ILI9341, etc.).
+The library targets the Arduino framework and works with any display driver compatible with `Adafruit_GFX` (e.g., monochrome SSD1306, 4-bit grayscale SSD1327, RGB565 color displays such as ST7789, ILI9341, etc.).
 
 ## Features
 
@@ -18,6 +18,7 @@ The library targets the Arduino framework and works with any display driver comp
 - Automatic sleep and dimming management based on configurable inactivity timers
 - Flexible hardware callbacks for display driver operations (`hwUpdate`, `hwClear`, `hwPower`, `hwDimming`, `hwInvert`)
 - Rich set of built-in UI elements and vector icons
+- Per-item foreground / background colors (monochrome, grayscale and RGB565 displays); the display-wide colors are the defaults
 - Character-level and item-level blinking (using 8-bit phase bitmasks) and inversion options
 - Efficient item storage: items are copied into library-owned buffers and redrawn only when changed or blinking
 - Programmer-defined limits (max items, max text length, max skipChars length) allocated once in the constructor, no dangling pointers
@@ -28,7 +29,7 @@ This library depends on:
 
 - `adafruit/Adafruit GFX Library`
 
-Defined in [library.json](library.json) and [platformio.ini](platformio.ini).
+Defined in [library.json](library.json) and [platformio.ini](platformio.ini). The Basic example additionally uses `adafruit/Adafruit SSD1327`.
 
 ## Quick Start
 
@@ -75,6 +76,48 @@ void loop() {
 }
 ```
 
+## Colors, grayscale and color displays
+
+`chrDisp` passes color values to the GFX driver unchanged, so the meaning of the value depends on the display:
+
+| Display | Color values |
+|---------|--------------|
+| Monochrome (SSD1306, ...) | `0` / `1` |
+| 4-bit grayscale (SSD1327) | `0` (black) ... `15` (white), `SSD1327_BLACK` / `SSD1327_WHITE` |
+| RGB565 color (ST7789, ILI9341, ...) | 16-bit RGB565 values |
+
+- The `fgColor` / `bgColor` constructor arguments (or `setColors()`) are the display-wide defaults. They are used for every item that does not set its own color, so existing code keeps working unchanged. The defaults are `0xFFFF` / `0x0000`; on an SSD1327 only the lower 4 bits count, so `0xFFFF` is still white, but passing `SSD1327_WHITE` / `SSD1327_BLACK` is cleaner.
+- `ItemProps::fgColor` / `ItemProps::bgColor` override the defaults for a single item. `chrDisp::COLOR_DEFAULT` (the default value of both) means "use the display's color", so an item may override just one of the two.
+- The icon draw methods and `drawItem()` take the same two optional `fgColor` / `bgColor` arguments at the end of their parameter list.
+- Clearing an item (`clearDisplayItem()`) always erases it, including its frame, with the display's default background.
+- Note: the `clearDisplay` callback of the driver (e.g. `Adafruit_SSD1306::clearDisplay()`) fills the screen with 0. If your default background is not 0, don't register the clear callback: `clear()` then fills the screen with the default `bgColor`.
+
+```cpp
+// SSD1327 SPI OLED: white on black by default, 15 = white, 0 = black
+chrDisp myDisp(&display, 15000, 4, 12, 0, SSD1327_WHITE, SSD1327_BLACK);
+
+chrDisp::ConstDisplayItem item;
+item.text = "Gray";
+item.fgColor = 15;  // white text...
+item.bgColor = 3;   // ...on a dark gray background (the background is filled around the text)
+myDisp.setDisplayItem(0, item);
+
+item = chrDisp::ConstDisplayItem();
+item.type = chrDisp::ITEM_BATTERY;
+item.width = 20;
+item.height = 10;
+item.data = 60;
+item.fgColor = 8;   // mid-gray battery, default (black) background
+myDisp.setDisplayItem(1, item);
+```
+
+### Inversion
+
+There are two kinds of inversion, both available on every color depth:
+
+- **Item inversion** (`ItemProps::invert`, `invert` argument of the draw methods): software-level, the item's foreground and background colors are swapped. So an item with `fgColor = 15`, `bgColor = 3` is drawn as 3 on 15 when inverted. For texts, the per-character modes (see `invert` in `ItemProps`) swap the colors of the selected characters only. This is why inversion needs no color math: it works on RGB565 and grayscale values alike.
+- **Display inversion** (`loop(..., invertDisplay)`, `invert()`): done by the display controller through the `setHwInvertCallback()` callback, e.g. `display.invertDisplay(inv)`. The SSD1306 inverts the pixels, the SSD1327 inverts all gray levels (`level -> 15 - level`), TFT controllers swap all colors. Without a registered callback there is no display inversion.
+
 ## API Reference (chrDisp Class)
 
 Public methods declared in [src/chrDisp.h](src/chrDisp.h):
@@ -100,7 +143,7 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 - `void setHwInvertCallback(HardwareBoolAction cb)`
 	- Registers callback for hardware screen inversion ON/OFF.
 - `void setColors(uint16_t fg, uint16_t bg)`
-	- Updates foreground and background colors.
+	- Updates the display-wide default foreground and background colors (items with their own `fgColor` / `bgColor` keep them).
 - `void on()`
 	- Powers on the display and resets sleep timers.
 - `void off()`
@@ -127,9 +170,9 @@ Public methods declared in [src/chrDisp.h](src/chrDisp.h):
 	- Returns `true` if display is currently powered on.
 - `uint32_t getTurnOffMs()`
 	- Returns configured turn-off timeout in milliseconds.
-- Icon drawing methods:
+- Icon drawing methods (the last two optional arguments are `int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT`):
 	- `drawVBar(...)`, `drawHBar(...)`, `drawBattery(...)`, `drawCharge(...)`, `drawCrosshair(...)`, `drawDisk(...)`, `drawWiFi(...)`, `drawAP(...)`, `drawPotmeter(...)`
-- `void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t val = 0)`
+- `void drawItem(ItemTypes type, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t blink = 0b11111111, bool invert = false, uint8_t frame = 0, uint8_t val = 0, int32_t fgColor = COLOR_DEFAULT, int32_t bgColor = COLOR_DEFAULT)`
 	- Generic dispatcher for drawing any item type by enum index.
 
 ## Display Items and UI Elements
@@ -163,6 +206,8 @@ struct ItemProps {              // common part of ConstDisplayItem and DisplayIt
     int16_t blinkChar = 0;
     uint8_t frame = 0;
     uint8_t data = 0;
+    int32_t fgColor = COLOR_DEFAULT;  // COLOR_DEFAULT: the display's fgColor
+    int32_t bgColor = COLOR_DEFAULT;  // COLOR_DEFAULT: the display's bgColor
     ItemStates state = ITEM_CLEARED; // managed by the library
 };
 
@@ -177,7 +222,7 @@ struct DisplayItem : ItemProps {        // stored item, edited in place
 };
 ```
 
-`size` controls the font scale for text items and defaults to `1`. Icons use `width` and `height` as their pixel dimensions; the circular potmeter uses `width` for its diameter and `zeroPointDeg` for its starting angle. For text, a positive `width` centers narrower text in that width, while a negative `width` right-aligns it within the absolute width. A nonzero `height` expands the text clearing area or frame to at least that height and vertically centers the text in it. Zero width or height leaves that dimension at the text's natural size.
+`size` controls the font scale for text items and defaults to `1`. Icons use `width` and `height` as their pixel dimensions; the circular potmeter uses `width` for its diameter and `zeroPointDeg` for its starting angle. For text, a positive `width` centers narrower text in that width, while a negative `width` right-aligns it within the absolute width. A nonzero `height` expands the text clearing area or frame to at least that height and vertically centers the text in it. Zero width or height leaves that dimension at the text's natural size. `fgColor` / `bgColor` set the item's colors (see [Colors](#colors-grayscale-and-color-displays)); `invert` swaps them.
 
 For example, a text item with `width = -80`, `height = 16`, and `frame = 1` is right-aligned in an 80-pixel-wide framed area, with text centered vertically:
 
@@ -225,7 +270,7 @@ Use `eventName(EventCode)` to map an event code to a static, human-readable name
 
 ## Build
 
-This repository is configured with PlatformIO.
+This repository is configured with PlatformIO. The [Basic example](examples/Basic/Basic.cpp) targets an ESP32 with a 128x128 SSD1327 SPI grayscale OLED (CS = 5, DC = 16, RESET = 17) and uses per-item gray levels.
 
 From project root:
 
